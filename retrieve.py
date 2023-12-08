@@ -8,6 +8,8 @@ import torch
 class Retrieve():
     def __init__(self, kwargs):
         self.model_name = kwargs['model_name']
+        self.eval_dataset_q = kwargs['eval_dataset_q']
+        self.eval_dataset_doc = kwargs['eval_dataset_doc']
 
         # match model class
         if self.model_name == 'splade':
@@ -25,13 +27,9 @@ class Retrieve():
         self.batch_size_sim = kwargs['batch_size_sim']
         self.top_k_documents = kwargs['top_k_documents']
 
-    def search(self, dataloader, return_embeddings=False):
-        return self.retriever.search(dataloader, self.batch_size, return_embeddings)
-
-
-    def retrieve(self, dataset_q, dataset_doc, return_embeddings=False, sort_by_score=True):
-        output_q = self.retriever.encode(dataset_q, self.batch_size)
-        output_doc = self.retriever.encode(dataset_doc, self.batch_size)
+    def eval(self, return_embeddings=False, sort_by_score=True):
+        output_q = self.retriever.encode(self.eval_dataset_q, self.batch_size)
+        output_doc = self.retriever.encode(self.eval_dataset_doc, self.batch_size)
         q_ids, q_embs = output_q['ids'], output_q['embeddings']
         doc_ids, doc_embs = output_doc['ids'], output_doc['embeddings']
         scores = self.sim_dot(q_embs, doc_embs)

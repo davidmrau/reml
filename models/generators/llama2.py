@@ -10,7 +10,7 @@ class Llama2():
         self.model_name = kwargs['model_name']
         #self.top_k_documents = kwargs['top_k_documents']
         if 'batch_size' in kwargs and kwargs['batch_size'] > 1:
-            raise NotImplemtedError('Only batch size 1 is implemented yet.')
+            raise NotImplementedError('Only batch size 1 is implemented yet.')
         self.batch_size = kwargs['batch_size']
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
@@ -20,25 +20,23 @@ class Llama2():
                             bnb_4bit_compute_dtype='float16',
                             bnb_4bit_use_dobule_quant=True
                         )
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config,use_flash_attention_2=True)
-
+        #self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config, use_flash_attention_2=True)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config)
         self.model.config.pretraining_tp = 1
-        self.model.config.pad_token_id = tokenizer.pad_token_id
-        self.model.resize_token_embeddings(len(tokenizer))
-        self.model.model.embed_tokens.padding_idx = len(tokenizer) - 1
+        self.model.config.pad_token_id = self.tokenizer.pad_token_id
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        self.model.model.embed_tokens.padding_idx = len(self.tokenizer) - 1
         self.model.model.embed_tokens._fill_padding_idx_with_zero()
 
         self.model.config.use_cache = True
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    def generate(self, query, documents):
+        self.device = torch.device('cpu') #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    @torch.no_grad()
+    def eval(self, query, documents):
         instrucion = self.format_instruction(query, documents)
-        instr_tokenized = tokenizer(instrucion, padding=True, truncation=True, return_tensors="pt", max_length=1024)
-        with torch.no_grad():
-            output = self.model.generate(**instr_tokenized.to(self.device), max_new_tokens=1, do_sample=False, output_scores=True, return_dict_in_generate=True)
-        generated_ids = model.generate(inputs.input_ids, max_length=30)
+        instr_tokenized = self.tokenizer(instrucion, padding=True, truncation=True, return_tensors="pt", max_length=1024)
+        generated_ids = self.model.generate(**instr_tokenized, max_new_tokens=1024)
 
-        generated_response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        generated_response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print(generated_response)
         return instrucion, generated_response
 
