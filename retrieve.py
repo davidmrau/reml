@@ -1,7 +1,7 @@
 # Retrieve
-from models.retrievers.bm25 import BM25
-from models.retrievers.dpr import DPR
-from models.retrievers.splade import Splade
+
+
+
 from torch.utils.data import DataLoader
 import torch
 
@@ -13,23 +13,26 @@ class Retrieve():
 
         # match model class
         if self.model_name == 'splade':
+            from models.retrievers.splade import Splade
             retriever_class = Splade
         elif self.model_name == 'BM25':
+            from models.retrievers.bm25 import BM25
             retriever_class = BM25
         else:
             #raise ValueError(f"Model {kwargs['model_name']} not implemented!")
+            from models.retrievers.dpr import DPR
             retriever_class = DPR
 
         # instaniate model
-        self.retriever = retriever_class(kwargs)
-        
+        self.module = retriever_class(kwargs)
+
         self.batch_size = kwargs['batch_size']
         self.batch_size_sim = kwargs['batch_size_sim']
         self.top_k_documents = kwargs['top_k_documents']
 
     def eval(self, return_embeddings=False, sort_by_score=True):
-        output_q = self.retriever.encode(self.eval_dataset_q, self.batch_size)
-        output_doc = self.retriever.encode(self.eval_dataset_doc, self.batch_size)
+        output_q = self.module.encode(self.eval_dataset_q, self.batch_size)
+        output_doc = self.module.encode(self.eval_dataset_doc, self.batch_size)
         q_ids, q_embs = output_q['ids'], output_q['embeddings']
         doc_ids, doc_embs = output_doc['ids'], output_doc['embeddings']
         scores = self.sim_dot(q_embs, doc_embs)

@@ -18,6 +18,8 @@ class DPR:
         token_embeddings = token_embeddings.masked_fill(~mask[..., None].bool(), 0.)
         sentence_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
         return sentence_embeddings
+
+        
     @torch.no_grad()
     def encode(self, dataset, batch_size):
         dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=self.data_collator)
@@ -41,9 +43,9 @@ class DPR:
     def index(self, dataloader, batch_size):
         pass
 
-    def tokenize(self, example, sentence_field, id_field):
-        inp_dict = self.tokenizer(example[sentence_field], truncation=True)
-        inp_dict['id'] = example[id_field]
+    def tokenize(self, example):
+        inp_dict = self.tokenizer(example["sentence"], truncation=True)
+        inp_dict['id'] = example["id"]
         return inp_dict
 
 # def collate_fn(self, examples):

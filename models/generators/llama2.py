@@ -42,9 +42,9 @@ class Llama2():
 
     def format_instruction(self, query, docs):
         instruction_prompt = '### Instruction: Please give answer given query and support documents'
-        docs_prompt = ''
+        docs_prompt = '### Documents:\n'
         for i, doc in enumerate(docs['sentence']):
-            docs_prompt += f"### Documents {i}: {doc} "
+            docs_prompt += f"Document {i}: {doc}\n"
         query_prompt = f'### Query: {query}'
         response_prompt = '### Response:'
         return f"""{instruction_prompt}
@@ -53,9 +53,9 @@ class Llama2():
 {response_prompt}"""
 
 
-    def tokenize(self, example, sentence_field, id_field):
+    def tokenize(self, example):
         inp_dict = defaultdict()
         # inp_dict = self.tokenizer(example[sentence_field], truncation=True)
-        inp_dict['id'] = example[id_field]
-        inp_dict['sentence'] = example[sentence_field]
+        inp_dict["id"] = example["id"]
+        inp_dict["sentence"] = example["sentence"]
         return inp_dict
