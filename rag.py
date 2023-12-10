@@ -41,11 +41,11 @@ class RAG:
 
         # rerank
         if self.reranker.model != None:
-            rerank_dataset = self.make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=False)
+            rerank_dataset = make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=False)
             out_rerank = self.reranker.eval(rerank_dataset)
             query_ids, doc_ids = out_retrieve['q_id'], out_retrieve['doc_id']
         
-        gen_dataset = self.make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=True)
+        gen_dataset = make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=True)
         query_ids, instructions, responses  = self.generator.eval(gen_dataset)
         return {
                 "instruction": instructions,
