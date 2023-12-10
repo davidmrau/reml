@@ -7,6 +7,6 @@ class DataCollatorWithId(DataCollatorWithPadding):
         # Use the parent DataCollatorWithPadding to handle other features
         batch = super().__call__(features)
         # Add document_id back to the batch without converting to numerical value
-        batch['ids'] = ids
+        batch['id'] = ids
 
         return batch

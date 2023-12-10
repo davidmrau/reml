@@ -6,35 +6,15 @@ from ..utils.collator import DataCollatorWithId
 from collections import defaultdict
 
 class Dummy():
-    def __init__(self, kwargs):
-        self.model_name = kwargs['model_name']
-        #self.top_k_documents = kwargs['top_k_documents']
-        if 'batch_size' in kwargs and kwargs['batch_size'] > 1:
-            raise NotImplemtedError('Only batch size 1 is implemented yet.')
-        self.batch_size = kwargs['batch_size']
-        #self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+    def __init__(self, model_name=None, max_new_tokens=1):
+        self.model_name = model_name
+        self.max_new_tokens = max_new_tokens
 
-    def eval(self, query, documents):
-        instrucion = self.format_instruction(query, documents)
-        generated_response = instrucion
-        return instrucion, generated_response
-
-    def format_instruction(self, query, docs):
-        instruction_prompt = '### Instruction: Please give answer given query and support documents'
-        docs_prompt = '### Documents:\n'
-        for i, doc in enumerate(docs['sentence']):
-            docs_prompt += f"Document {i+1}: {doc}\n"
-        query_prompt = f'### Query: {query}'
-        response_prompt = '### Response:'
-        return f"""{instruction_prompt}
-{query_prompt}
-{docs_prompt}
-{response_prompt}"""
-
+    def generate(self, inp):
+        return inp
 
     def tokenize(self, example):
         inp_dict = defaultdict()
-        # inp_dict = self.tokenizer(example[sentence_field], truncation=True)
         inp_dict['id'] = example["id"]
         inp_dict['sentence'] = example["sentence"]
         return inp_dict

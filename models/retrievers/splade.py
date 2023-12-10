@@ -1,11 +1,28 @@
-from transformers import AutoModel
-class Splade:
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+from torch.utils.data import DataLoader
+import torch
+from ..utils.collator import DataCollatorWithId
 
+class Splade:
     def __init__(self, model_name):
 
         self.model_name = model_name
-        self.model = AutoModel.from_pretrained(model_name, device_map='auto', low_cpu_mem_usage=True, torch_dtype=torch.float16)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForMaskedLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self.model.to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.data_collator = DataCollatorWithId(tokenizer=self.tokenizer)
+    
 
-    def search(self):
-        return
+    def __call__(self, kwargs):
+        outputs = self.model(**kwargs.to(self.device))
+        # pooling over hidden representations
+        emb, _ = torch.max(torch.log(1 + torch.relu(outputs)) * kwargs["attention_mask"].unsqueeze(-1), dim=1) 
+        return {
+                "embedding": emb
+            }
+
+    def tokenize(self, example):
+        inp_dict = self.tokenizer(example["sentence"], truncation=True)
+        inp_dict['id'] = example["id"]
+        return inp_dict

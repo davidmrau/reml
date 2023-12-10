@@ -1,18 +1,18 @@
-
+import torch
 
 
 # Generate
 class Generate():
-    def __init__(self, kwargs):
-        self.model_name = kwargs['model_name']
-        self.eval_dataset_q = kwargs['eval_dataset_q']
-        self.eval_dataset_doc = kwargs['eval_dataset_doc']
-        self.retriever = kwargs['retriever']
-        self.reranker = kwargs['reranker']
+    def __init__(self, model_name=None, batch_size=1, max_new_tokens=1, format_instruction=None):
 
+        self.batch_size = batch_size
+        self.model_name = model_name
+        self.format_instruction = format_instruction
+
+        if self.batch_size > 1:
+            raise NotImplementedError('Only batch size 1 is implemented yet.')
         # match model class
         if self.model_name == None:
-            print('Not using a Generator!')
             self = None
         elif self.model_name == 'dummy':
             from models.generators.dummy import Dummy
@@ -24,30 +24,11 @@ class Generate():
             raise NotImplementedError(f"Model {self.model_name} not implemented!")
 
         # instatiate model
-        self.module = generator_class(kwargs)
+        self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens)
 
-        # make idx to id mapping
-        self.eval_dataset_q = self.eval_dataset_q.add_column("index", range(len(self.eval_dataset_q)))
-        self.q_map_eval = dict(zip(self.eval_dataset_q["id"], self.eval_dataset_q["index"]))
+    @torch.no_grad()
+    def eval(self, query, documents):
+        instruction = self.format_instruction(query, documents)
+        generated_response = self.model.generate(instruction)
+        return instruction, generated_response
 
-        self.eval_dataset_doc = self.eval_dataset_doc.add_column("index", range(len(self.eval_dataset_doc)))
-        self.d_map_eval = dict(zip(self.eval_dataset_doc["id"], self.eval_dataset_doc["index"]))
-
-
-
-    def eval(self, query_ids, doc_ids):
-        assert len(doc_ids) == len(query_ids)
-        q_idxs = [ self.q_map_eval[id_] for id_ in query_ids]
-        queries = self.eval_dataset_q[q_idxs]['sentence']
-        responses = list()
-        instructions = list()
-        for i in range(len(query_ids)):
-            d_idxs = [ self.d_map_eval[id_] for id_ in doc_ids[i]]
-            docs = self.eval_dataset_doc[d_idxs]
-            instruction, response  = self.module.generate(queries[i], docs)
-            responses.append(response)
-            instructions.append(instruction)
-        return {
-                "instructions": instructions,
-                "responses": responses
-            }

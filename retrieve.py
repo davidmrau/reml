@@ -6,10 +6,13 @@ from torch.utils.data import DataLoader
 import torch
 
 class Retrieve():
-    def __init__(self, kwargs):
-        self.model_name = kwargs['model_name']
-        self.eval_dataset_q = kwargs['eval_dataset_q']
-        self.eval_dataset_doc = kwargs['eval_dataset_doc']
+    def __init__(self, model_name=None, datasets=None, batch_size=1, batch_size_sim=1, top_k_documents=1):
+
+        self.model_name = model_name
+        self.datasets = datasets
+        self.batch_size = batch_size
+        self.batch_size_sim = batch_size_sim
+        self.top_k_documents = top_k_documents
 
         # match model class
         if self.model_name == 'splade':
@@ -24,17 +27,34 @@ class Retrieve():
             retriever_class = DPR
 
         # instaniate model
-        self.module = retriever_class(kwargs)
+        self.model = retriever_class(model_name=self.model_name)
 
-        self.batch_size = kwargs['batch_size']
-        self.batch_size_sim = kwargs['batch_size_sim']
-        self.top_k_documents = kwargs['top_k_documents']
+ 
+    def encode(self, dataset):
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.data_collator)
+        embs_list = list()
+        ids = list()
+        for batch in dataloader:
+            batch_ids = batch.pop('id')
+            ids += batch_ids
+            outputs = self.model(batch)
+            emb = outputs['embedding']
+            embs_list.append(emb)
 
+        embs = torch.cat(embs_list)
+
+        return {
+            "id": ids,
+            "embedding": embs
+            }
+
+
+    @torch.no_grad()
     def eval(self, return_embeddings=False, sort_by_score=True):
-        output_q = self.module.encode(self.eval_dataset_q, self.batch_size)
-        output_doc = self.module.encode(self.eval_dataset_doc, self.batch_size)
-        q_ids, q_embs = output_q['ids'], output_q['embeddings']
-        doc_ids, doc_embs = output_doc['ids'], output_doc['embeddings']
+        output_q = self.encode(self.datasets['eval']['query'])
+        output_doc = self.encode(self.datasets['eval']['doc'])
+        q_ids, q_embs = output_q['id'], output_q['embedding']
+        doc_ids, doc_embs = output_doc['id'], output_doc['embedding']
         scores = self.sim_dot(q_embs, doc_embs)
         if sort_by_score:
             idxs_sorted = self.sort_by_score_indexes(scores)
@@ -49,11 +69,11 @@ class Retrieve():
 
 
         return {
-            "doc_embs": doc_embs if return_embeddings else None,
-            "q_embs": q_embs if return_embeddings else None,
-            "scores": scores,
-            "q_ids": q_ids,
-            "doc_ids": doc_ids
+            "doc_emb": doc_embs if return_embeddings else None,
+            "q_emb": q_embs if return_embeddings else None,
+            "score": scores,
+            "q_id": q_ids,
+            "doc_id": doc_ids
             }
 
     def sort_by_score_indexes(self, scores):
@@ -73,6 +93,17 @@ class Retrieve():
                 scores.append(scores_q)
         scores = torch.stack(scores)
         return scores
+    
+
+    def tokenize(self, example):
+       return self.model.tokenize(example)
+
+
+
+
+
+
+
 
     # def sim_dot_batch(self, q_emb_dataset, doc_emb_dataset, batch_size):
     #     raise NotImplemtedError('this code is wrong and not finished!')

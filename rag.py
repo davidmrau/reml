@@ -2,67 +2,75 @@
 from retrieve import Retrieve
 from rerank import Rerank
 from generate import Generate
+from datasets import Dataset
+import torch
+from collections import defaultdict
 
 class RAG:
-    def __init__(self, generator_kwargs, retriever=None, reranker=None):
+    def __init__(self, generator_kwargs=None, retriever_kwargs=None, reranker_kwargs=None, experiment_folder=None, datasets=None):
 
-        self.eval_dataset_q = generator_kwargs['eval_dataset_q']
-        self.eval_dataset_doc = generator_kwargs['eval_dataset_doc']
-        self.model_name = generator_kwargs['model_name']
-        self.retriever = retriever
-        self.reranker = reranker
-        self.modules = {"retriever": self.retriever, "reranker": self.reranker}
-        # match model class
-        if self.model_name == None:
-            print('Not using a Generator!')
-            self = None
-        elif self.model_name == 'dummy':
-            from models.generators.dummy import Dummy
-            generator_class = Dummy
-        elif self.model_name == 'meta-llama/Llama-2-7b-chat-hf':
-            from models.generators.llama2 import Llama2
-            generator_class = Llama2
-        else:
-            raise NotImplementedError(f"Model {self.model_name} not implemented!")
+        self.datasets = datasets
+        
+        # init modules 
 
-        # instatiate model
-        self.generator = generator_class(generator_kwargs)
+        print(f"Loading Retriever: {retriever_kwargs['model_name']}")
+        self.retriever = Retrieve(**retriever_kwargs, datasets=defaultdict(dict))
 
-        # make idx to id mapping
-        self.eval_dataset_q = self.eval_dataset_q.add_column("index", range(len(self.eval_dataset_q)))
-        self.q_map_eval = dict(zip(self.eval_dataset_q["id"], self.eval_dataset_q["index"]))
+        print(f"Loading Reranker: {reranker_kwargs['model_name']}")
+        self.reranker = Rerank(**reranker_kwargs, datasets=defaultdict(dict)) 
 
-        self.eval_dataset_doc = self.eval_dataset_doc.add_column("index", range(len(self.eval_dataset_doc)))
-        self.d_map_eval = dict(zip(self.eval_dataset_doc["id"], self.eval_dataset_doc["index"]))
+        print(f"Loading Generator: {generator_kwargs['model_name']}")
+        self.generator = Generate(**generator_kwargs)
+
+        self.experiment_folder = experiment_folder
+        self.modules = {"retriever": self.retriever, "reranker": self.reranker, 'generator': self.generator}
 
 
+        # process data on init
         self.process_data()
-
-    def process_data(self):
-        for mod_name, mod in self.modules.items():
-            if mod.module != None:
-                print(f'Processing dataset for {mod_name}...')
-                mod.eval_dataset_q = mod.eval_dataset_q.map(mod.module.tokenize, batched=True)
-                mod.eval_dataset_doc = mod.eval_dataset_doc.map(mod.module.tokenize, batched=True) #fn_kwargs={"sentence_field": mod.eval_dataset_doc.sentence_field, "id_field": mod.eval_dataset_doc.id_field})
-                mod.eval_dataset_q = mod.eval_dataset_q.remove_columns(['sentence'])
-                mod.eval_dataset_doc = mod.eval_dataset_doc.remove_columns(['sentence'])
-        # init datasets retriever
 
     def zero_shot_single_retrieval(self):
         out_retrieve = self.retriever.eval(return_embeddings=False)
-        query_ids, doc_ids = out_retrieve['q_ids'], out_retrieve['doc_ids']
+        query_ids, doc_ids = out_retrieve['q_id'], out_retrieve['doc_id']
         assert len(doc_ids) == len(query_ids)
-        q_idxs = [ self.q_map_eval[id_] for id_ in query_ids]
-        queries = self.eval_dataset_q[q_idxs]['sentence']
+        print(query_ids)
+        q_idxs = [ self.datasets['eval']['query'].id2index[id_] for id_ in query_ids]
+        queries = self.datasets['eval']['query'][q_idxs]['sentence']
         responses = list()
         instructions = list()
         for i in range(len(query_ids)):
-            d_idxs = [ self.d_map_eval[id_] for id_ in doc_ids[i]]
-            docs = self.eval_dataset_doc[d_idxs]
+            d_idxs = [ self.datasets['eval']['doc'].id2index[id_] for id_ in doc_ids[i]]
+            docs = self.datasets['eval']['doc'][d_idxs]
             instruction, response  = self.generator.eval(queries[i], docs)
             responses.append(response)
             instructions.append(instruction)
         return {
-                "instructions": instructions,
-                "responses": responses
+                "instruction": instructions,
+                "response": responses
             }
+    def index(self, ):
+        #datatset_path = f'{}'
+        output = retriever.encode(self.eval_dataset_doc, self.batch_size)
+        ids, embs = output['id'], output['embedding']
+        dataset = Dataset.from_dict({'id': ids, 'embedding': embs})
+        
+    def process_data(self):
+        
+        # make mapping from str id to index for easy lookup by id
+        for split in self.datasets:
+            for dataset in self.datasets[split]:
+                if self.datasets[split][dataset] != None:
+                    self.datasets[split][dataset] = self.datasets[split][dataset].add_column("index", range(len(self.datasets[split][dataset])))
+                    self.datasets[split][dataset].id2index = dict(zip(self.datasets[split][dataset]["id"], self.datasets[split][dataset]["index"]))
+
+        # process data for modules individually as they can have differnt tokenizers
+        for mod_name, mod in self.modules.items():
+            if mod_name == 'retriever':
+                print(f'Processing dataset for {mod_name}...')
+                for split in self.datasets:
+                    for dataset in self.datasets[split]:
+                        if self.datasets[split][dataset] != None:
+                            print(f'Processing {split} {dataset}')
+                            mod.datasets[split][dataset] = self.datasets[split][dataset].map(mod.tokenize, batched=True)
+                            mod.datasets[split][dataset] = mod.datasets[split][dataset].remove_columns(['sentence'])
+                            mod.datasets[split][dataset] = mod.datasets[split][dataset].remove_columns(['index'])
