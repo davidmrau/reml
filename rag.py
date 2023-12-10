@@ -101,15 +101,13 @@ class RAG:
         for i, q_id in enumerate(q_ids):
             if multi_doc:
                 docs = self.get_by_ids(dataset['doc'], d_ids[i])
+                if multi_doc:
+                    dataset_dict['doc'].append(docs)
+                else:
+                    for d_id, doc in zip(d_ids[i], docs):
+                        dataset_dict['d_id'].append(d_id)
+                        dataset_dict['doc'].append(doc)
                 dataset_dict['query'].append(queries[i])
-                dataset_dict['doc'].append(docs)
                 dataset_dict['q_id'].append(q_id)
-            else:
-                docs = self.get_by_ids(dataset['doc'], d_ids[i])
-                for d_id, doc in zip(d_ids[i], docs):
-                    dataset_dict['d_id'].append(d_id)
-                    dataset_dict['query'].append(queries[i])
-                    dataset_dict['doc'].append(doc)
-                    dataset_dict['q_id'].append(q_id) 
         return Dataset.from_dict(dataset_dict)
 
