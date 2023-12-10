@@ -2,10 +2,9 @@ import os
 from retrieve import Retrieve
 from rerank import Rerank
 from generate import Generate
-from datasets import Dataset
 import torch
 from collections import defaultdict
-
+from utils import make_hf_dataset, get_by_ids
 from datasets.fingerprint import Hasher
 
 class RAG:
@@ -87,27 +86,4 @@ class RAG:
                             mod.datasets[split][subset] = self.datasets[split][subset].map(mod.tokenize, batched=True)
                             mod.datasets[split][subset] = mod.datasets[split][subset].remove_columns(['sentence'])
                             mod.datasets[split][subset] = mod.datasets[split][subset].remove_columns(['index'])
-
-    def get_by_ids(self, dataset, ids):
-        idxs = [ dataset.id2index[id_] for id_ in ids]
-        return dataset[idxs]['sentence']
-    
-    def make_hf_dataset(self, dataset, q_ids, d_ids, multi_doc=False):
-        dataset_dict = {'query': [], 'doc': [], 'q_id': []}
-        if not multi_doc:
-            dataset_dict['d_id'] = []
-        
-        queries = self.get_by_ids(dataset['query'], q_ids)
-        for i, q_id in enumerate(q_ids):
-            if multi_doc:
-                docs = self.get_by_ids(dataset['doc'], d_ids[i])
-                if multi_doc:
-                    dataset_dict['doc'].append(docs)
-                else:
-                    for d_id, doc in zip(d_ids[i], docs):
-                        dataset_dict['d_id'].append(d_id)
-                        dataset_dict['doc'].append(doc)
-                dataset_dict['query'].append(queries[i])
-                dataset_dict['q_id'].append(q_id)
-        return Dataset.from_dict(dataset_dict)
 
