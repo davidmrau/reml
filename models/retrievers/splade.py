@@ -11,7 +11,7 @@ class Splade:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.model.to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.data_collator = DataCollatorWithId(tokenizer=self.tokenizer)
+        self.collate_fn = DataCollatorWithId(tokenizer=self.tokenizer)
     
 
     def __call__(self, kwargs):

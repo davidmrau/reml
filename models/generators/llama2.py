@@ -6,8 +6,9 @@ from ..utils.collator import DataCollatorWithId
 from collections import defaultdict
 
 class Llama2():
-    def __init__(self, model_name=None, max_new_tokens=1):
+    def __init__(self, model_name=None, max_new_tokens=1, format_instruction=None):
         self.model_name = model_name
+        self.format_instruction = format_instruction
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
         quant_config = BitsAndBytesConfig(
@@ -36,8 +37,17 @@ class Llama2():
         inp_dict["sentence"] = example["sentence"]
         return inp_dict
 
-    def generate(self, instr):
-        instr_tokenized = self.model.tokenizer(instr, padding=True, truncation=True, return_tensors="pt", max_length=1024)
+       
+    def collate_fn(self, examples):
+        ids = [e['q_id'] for e in examples]
+        instr = [self.format_instruction(e) for e in examples]
+        inp_dict = self.model.tokenizer(instr, padding=True, truncation=True, return_tensors="pt", max_length=1024)
+        inp_dict['q_id'] = ids
+        inp_dict['instr'] = instr
+        return inp_dict
+        
+    def generate(self, instr_tokenized):
         generated_ids =  self.generator.generate(**instr_tokenized.to(self.device), max_new_tokens=self.max_new_tokens)
         generated_response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        return generated response
+        return generated_response
+

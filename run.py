@@ -9,15 +9,15 @@ def main():
     dataset.sentence_field = 'sentence'
     dataset.id_field = "id"
 
-    def format_instruction(query, docs):
+    def format_instruction(sample):
         docs_prompt = ''
-        for i, doc in enumerate(docs['sentence']):
+        for i, doc in enumerate(sample['doc']):
             docs_prompt += f"Document {i}: {doc}\n"
         return f"""### Instructions: Please write a response given the query and support documents:
-### Query: {query}
+### Query: {sample['query']}
 ### Documents:
 {docs_prompt}
-### Response"""
+### Response:"""
 
     datasets  = {
         "train": {
@@ -41,7 +41,10 @@ def main():
             }
 
     reranker_kwargs = {
-            "model_name": None
+            "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+            #"model_name": None,
+            "batch_size": 3, 
+            "top_k_documents": 3,
             }
 
     generator_kwargs = {
@@ -65,8 +68,9 @@ def main():
     out_generate = rag.zero_shot_single_retrieval()
 
     # print
-    for instr, response in zip(out_generate['response'], out_generate['instruction']):
+    for id_, instr, response in zip(out_generate['q_id'], out_generate['response'], out_generate['instruction']):
         print('_'*40)
+        print('Query id', id_)
         print('Instruction to Generator:')
         print(instr)
         print()

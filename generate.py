@@ -1,5 +1,6 @@
 import torch
-
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 # Generate
 class Generate():
@@ -24,11 +25,23 @@ class Generate():
             raise NotImplementedError(f"Model {self.model_name} not implemented!")
 
         # instatiate model
-        self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens)
+        self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
 
     @torch.no_grad()
-    def eval(self, query, documents):
-        instruction = self.format_instruction(query, documents)
-        generated_response = self.model.generate(instruction)
-        return instruction, generated_response
+    def eval(self, dataset):
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
+        responses = list()
+        instructions = list()
+        query_ids = list()
+        for batch in tqdm(dataloader, desc='Generating'):
+            id_ = batch.pop('q_id')
+            instruction = batch.pop('instruction')
+            query_ids += id_
+            instructions += instruction
+            generated_response = self.model.generate(instruction)
+            responses += generated_response
+        return query_ids, instruction, generated_response
 
+       
+
+     

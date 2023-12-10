@@ -1,7 +1,5 @@
 # Retrieve
-
-
-
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch
 
@@ -31,30 +29,20 @@ class Retrieve():
 
  
     def encode(self, dataset):
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.data_collator)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
         embs_list = list()
-        ids = list()
-        for batch in dataloader:
-            batch_ids = batch.pop('id')
-            ids += batch_ids
+        for batch in tqdm(dataloader, desc='Encoding'):
             outputs = self.model(batch)
             emb = outputs['embedding']
             embs_list.append(emb)
-
         embs = torch.cat(embs_list)
-
-        return {
-            "id": ids,
-            "embedding": embs
-            }
-
+        return embs
 
     @torch.no_grad()
-    def eval(self, return_embeddings=False, sort_by_score=True):
-        output_q = self.encode(self.datasets['eval']['query'])
-        output_doc = self.encode(self.datasets['eval']['doc'])
-        q_ids, q_embs = output_q['id'], output_q['embedding']
-        doc_ids, doc_embs = output_doc['id'], output_doc['embedding']
+    def retrieve(self, doc_embs, return_embeddings=False, sort_by_score=True):
+        doc_ids = self.datasets['eval']['doc']['id']
+        q_ids = self.datasets['eval']['query']['id']
+        q_embs = self.encode(self.datasets['eval']['query']) 
         scores = self.sim_dot(q_embs, doc_embs)
         if sort_by_score:
             idxs_sorted = self.sort_by_score_indexes(scores)
