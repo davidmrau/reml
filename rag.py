@@ -15,14 +15,14 @@ class RAG:
         self.run_name = run_name
 
         # add index for lookup by id
-        self.add_index()
+        self.add_idx_to_datsets()
 
         print(':'*100)
         print('RAG Model:')
         # init modules
         print(f"Loading Retriever: {retriever_kwargs['model_name']}")
         
-        self.retriever = Retrieve(**retriever_kwargs, datasets=datasets, index_dir=f'{self.experiment_folder}/{self.run_name}/indexes')
+        self.retriever = Retrieve(**retriever_kwargs, datasets=datasets, index_dir='indexes')
 
         print(f"Loading Reranker: {reranker_kwargs['model_name']}")
         self.reranker = Rerank(**reranker_kwargs)
@@ -72,7 +72,7 @@ class RAG:
             }
     
 
-    def add_index(self):
+    def add_idx_to_datsets(self):
         # make mapping from str id to index for easy lookup by id
         for split in self.datasets:
             for subset in self.datasets[split]:
