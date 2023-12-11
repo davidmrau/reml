@@ -2,6 +2,7 @@
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch
+from collections import defaultdict
 
 # reranking
 class Rerank():
@@ -22,9 +23,9 @@ class Rerank():
     def eval(self, dataset, return_embeddings=False):
         # get dataloader
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
-        q_ids, d_ids, scores = list(), list(), list()
+        q_ids, d_ids, scores, embs_list = list(), list(), list(), list()
         # run inference on the dataset
-        for batch in tqdm(dataloader, desc='Reranking...'):
+        for batch in tqdm(dataloader, desc=f'Reranking: {self.model_name}'):
             q_ids += batch.pop('q_id')
             d_ids += batch.pop('d_id')
             outputs = self.model(batch)
@@ -33,32 +34,30 @@ class Rerank():
             if return_embeddings:
                 emb = outputs['embedding']
                 embs_list.append(emb)
-
-        # stack scores        
-        scores = torch.stack(scores).squeeze(-1)
-        idxs_sorted = self.sort_by_score_indexes(scores)
-        # get top-k indices
-        idxs_sorted_top_k = idxs_sorted[:, :self.top_k_documents]
-        if return_embeddings:
-            # use sorted top-k indices indices to retrieve corresponding document embeddings
-            doc_embs = doc_embs[idxs_sorted_top_k]
-        # use sorted top-k indices to gather scores
-        scores = scores.gather(dim=1, index=idxs_sorted_top_k)
-        # Use sorted top-k indices indices to retrieve corresponding document IDs
-        d_ids = [[d_ids[i] for i in q_idxs] for q_idxs in idxs_sorted_top_k]
+ 
+        # get flat tensor of scores        
+        scores = torch.cat(scores).ravel()
+        # sort by scores 
+        q_ids_sorted, d_ids_sorted, scores_sorted = self.sort_by_score_indexes(scores, q_ids, d_ids)
 
         return {
-            "doc_emb": doc_embs if return_embeddings else None,
-            "q_emb": q_embs if return_embeddings else None,
-            "score": scores,
-            "q_id": q_ids,
-            "doc_id": d_ids
+            "emb": embs_list if return_embeddings else None,
+            "score": scores_sorted,
+            "doc_id": d_ids_sorted,
+            "q_id": q_ids_sorted,
             }
-
-    def sort_by_score_indexes(self, scores):
-        idxs_sorted = list()
-        for q_scores in scores:
-            idx_sorted = torch.argsort(q_scores, descending=True)
-            idxs_sorted.append(idx_sorted)
-        idxs_sorted = torch.stack(idxs_sorted)
-        return idxs_sorted
+    
+   # takes scores (num_queries x top_k) and q_ids and sortes them per q_id by score and returns list of sorted idxs
+    def sort_by_score_indexes(self, scores, q_ids, d_ids):
+        ranking = defaultdict(list)
+        q_ids_sorted, doc_ids_sorted, scores_sorted = list(), list(), list()
+        for i, (q_id, d_id) in enumerate(zip(q_ids, d_ids)):
+            ranking[q_id].append((scores[i], d_id))
+        for q_id in ranking:
+            # sort (score, doc_id) by score
+            sorted_list = sorted(ranking[q_id], key=lambda x: x[0])
+            score_sorted, d_id_sorted = zip(*sorted_list)
+            scores_sorted.append(torch.stack(score_sorted))
+            doc_ids_sorted.append(list(d_id_sorted))
+            q_ids_sorted.append(q_id)
+        return q_ids_sorted, doc_ids_sorted, scores_sorted

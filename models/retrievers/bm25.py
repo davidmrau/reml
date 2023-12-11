@@ -1,3 +1,4 @@
+from pyserini.search import SimpleSearcher
 
 class BM25:
     def __init__(self, model_name):

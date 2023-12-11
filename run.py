@@ -19,7 +19,6 @@ def main():
         return f"""### Instructions: Please write a response given the query and support documents:\n### Query: {sample['query']}\n### Documents:{docs_prompt}\n### Response:"""
 
 
-
     datasets  = {
         "train": {
                 "doc": None,
@@ -34,6 +33,7 @@ def main():
                 "query": None,
             },
     }
+
     retriever_kwargs = {
             "model_name": "facebook/contriever",
             "batch_size": 3,
@@ -45,7 +45,7 @@ def main():
             "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
             #"model_name": None,
             "batch_size": 3,
-            "top_k_documents": 3,
+            "top_k_documents": 2,
             }
 
     generator_kwargs = {
@@ -55,7 +55,6 @@ def main():
             "max_new_tokens": 1024,
             "format_instruction": format_instruction,
             }
-
 
     rag_kwargs = {
             "retriever_kwargs": retriever_kwargs,

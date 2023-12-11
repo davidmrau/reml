@@ -20,7 +20,7 @@ class CrossEncoder:
 
     def collate_fn(self, examples):
         question = [e['query'] for e in examples]
-        doc= [e['doc'] for e in examples]
+        doc = [e['doc'] for e in examples]
         q_id = [e['q_id'] for e in examples]
         d_id = [e['d_id'] for e in examples]
         inp_dict = self.tokenizer(question, doc, padding=True, truncation='only_second', return_tensors='pt')

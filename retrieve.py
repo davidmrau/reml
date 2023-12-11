@@ -58,7 +58,6 @@ class Retrieve():
         q_ids = self.datasets['eval']['query']['id']
         q_embs = self.encode(self.datasets['eval']['query'])
         scores = self.sim_dot(q_embs, doc_embs)
-        print('retrieve scores shape', scores.shape)
         if sort_by_score:
             idxs_sorted = self.sort_by_score_indexes(scores)
             # get top-k indices
@@ -104,22 +103,27 @@ class Retrieve():
 
 
 
-    # def sim_dot_batch(self, q_emb_dataset, doc_emb_dataset, batch_size):
-    #     raise NotImplemtedError('this code is wrong and not finished!')
-    #     dataloader_doc = DataLoader(doc_emb_dataset, batch_size=batch_size, shuffle=False)
-    #     # Iterate through document embeddings batches
-    #     scores_list = []
-    #     print(len(dataloader_doc))
-    #     for doc_emb in dataloader_doc:
-    #         dataloader_queries = DataLoader(q_emb_dataset, batch_size=batch_size, shuffle=False)
-    #         print(len(dataloader_queries))
-    #         for q_emb in dataloader_queries:
-    #             with torch.inference_mode():
-    #                 batch_score = torch.matmul(q_emb.transpose(0,), doc_emb.t())
-    #
-    #             scores_list.append(batch_score)
-    #
-    #     # Concatenate results to obtain the final dot product matrix
-    #     scores = torch.cat(scores_list)
-    #
-    #     return scores
+
+
+
+
+    # code in case dot product between query and all docs leads to OOM, needs to be revised!!
+    def sim_dot_batch(self, q_emb_dataset, doc_emb_dataset, batch_size):
+        raise NotImplementedError('this code is wrong and not finished!')
+        dataloader_doc = DataLoader(doc_emb_dataset, batch_size=batch_size, shuffle=False)
+        # Iterate through document embeddings batches
+        scores_list = []
+        print(len(dataloader_doc))
+        for doc_emb in dataloader_doc:
+            dataloader_queries = DataLoader(q_emb_dataset, batch_size=batch_size, shuffle=False)
+            print(len(dataloader_queries))
+            for q_emb in dataloader_queries:
+                with torch.inference_mode():
+                    batch_score = torch.matmul(q_emb.transpose(0,), doc_emb.t())
+    
+                scores_list.append(batch_score)
+    
+        # Concatenate results to obtain the final dot product matrix
+        scores = torch.cat(scores_list)
+    
+        return scores
