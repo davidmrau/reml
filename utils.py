@@ -2,13 +2,14 @@ import datasets
 
 def get_by_ids(dataset, ids):
     idxs = [ dataset.id2index[id_] for id_ in ids]
+    print(dataset[idxs])
     return dataset[idxs]['sentence']
 
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
     dataset_dict = {'query': [], 'doc': [], 'q_id': []}
     if not multi_doc:
         dataset_dict['d_id'] = []
-    
+
     queries = get_by_ids(dataset['query'], q_ids)
     for i, q_id in enumerate(q_ids):
         if multi_doc:
@@ -22,6 +23,19 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
             dataset_dict['query'].append(queries[i])
             dataset_dict['q_id'].append(q_id)
     return datasets.Dataset.from_dict(dataset_dict)
+
+def print_generate_out(gen_out):
+    id_, instr, response = gen_out['q_id'], gen_out['instruction'], gen_out['response']
+    print('_'*40)
+    print('Query id', id_)
+    print('Instruction to Generator:')
+    print(instr)
+    print()
+    print('Generated Response:')
+    print(response)
+    print()
+    print()
+
 
 
 
@@ -43,5 +57,3 @@ class LookupDatasetHF(datasets.Dataset):
             ids = list(ids)
         idx = [self.id2idx_map[id_] for id_ in ids]
         return self[idx]
-
-

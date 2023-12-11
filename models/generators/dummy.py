@@ -20,7 +20,7 @@ class Dummy():
         inp_dict['sentence'] = example["sentence"]
         return inp_dict
 
-    def collate_fn(self, examples): 
+    def collate_fn(self, examples):
         ids = [e['q_id'] for e in examples]
         inp_dict = dict()
         instr= [self.format_instruction(e) for e in examples]

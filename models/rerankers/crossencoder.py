@@ -17,7 +17,7 @@ class CrossEncoder:
         return {
                 "score": score
             }
-        
+
     def collate_fn(self, examples):
         question = [e['query'] for e in examples]
         doc= [e['doc'] for e in examples]
@@ -27,4 +27,3 @@ class CrossEncoder:
         inp_dict['q_id'] = q_id
         inp_dict['d_id'] = d_id
         return inp_dict
-

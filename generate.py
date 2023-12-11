@@ -27,7 +27,6 @@ class Generate():
         # instatiate model
         self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
 
-    @torch.no_grad()
     def eval(self, dataset):
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
         responses = list()
@@ -41,7 +40,3 @@ class Generate():
             generated_response = self.model.generate(instruction)
             responses += generated_response
         return query_ids, instruction, generated_response
-
-       
-
-     

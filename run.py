@@ -1,28 +1,29 @@
 def main():
     import datasets
     from rag import RAG
+    from utils import print_generate_out
 
-
-    experiment_folder = 'experiment_1'
+    experiment_folder = 'experiments'
+    run_name = 'experiment_1'
 
     dataset = datasets.Dataset.from_dict({'sentence': ['this is the first sentence', 'desktop computer', 'soccer field', 'anatomy the docer', 'a table is set for breakfast']*3, 'id': ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15']})
     dataset.sentence_field = 'sentence'
     dataset.id_field = "id"
 
+
+
     def format_instruction(sample):
         docs_prompt = ''
         for i, doc in enumerate(sample['doc']):
             docs_prompt += f"Document {i}: {doc}\n"
-        return f"""### Instructions: Please write a response given the query and support documents:
-### Query: {sample['query']}
-### Documents:
-{docs_prompt}
-### Response:"""
+        return f"""### Instructions: Please write a response given the query and support documents:\n### Query: {sample['query']}\n### Documents:{docs_prompt}\n### Response:"""
+
+
 
     datasets  = {
         "train": {
-                "doc": dataset,
-                "query": dataset,
+                "doc": None,
+                "query": None,
             },
         "eval": {
                 "doc": dataset,
@@ -35,7 +36,7 @@ def main():
     }
     retriever_kwargs = {
             "model_name": "facebook/contriever",
-            "batch_size": 3, 
+            "batch_size": 3,
             "batch_size_sim": 8,
             "top_k_documents": 3,
             }
@@ -43,7 +44,7 @@ def main():
     reranker_kwargs = {
             "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
             #"model_name": None,
-            "batch_size": 3, 
+            "batch_size": 3,
             "top_k_documents": 3,
             }
 
@@ -57,28 +58,18 @@ def main():
 
 
     rag_kwargs = {
-            "retriever_kwargs": retriever_kwargs, 
+            "retriever_kwargs": retriever_kwargs,
             "reranker_kwargs": reranker_kwargs,
-            "generator_kwargs": generator_kwargs, 
+            "generator_kwargs": generator_kwargs,
             "experiment_folder": experiment_folder,
+            "run_name": run_name,
             "datasets": datasets,
     }
 
     rag = RAG(**rag_kwargs)
     out_generate = rag.zero_shot_single_retrieval()
 
-    # print
-    for id_, instr, response in zip(out_generate['q_id'], out_generate['response'], out_generate['instruction']):
-        print('_'*40)
-        print('Query id', id_)
-        print('Instruction to Generator:')
-        print(instr)
-        print()
-        print('Generated Response:')
-        print(response)
-        print()
-        print()
+    print_generate_out(out_generate)
 
-    #dataset_reranker = dataset.map(reranker.retriever.tokenize, batched=True) if rerank.reranker != None else None
 if __name__ == "__main__":
     main()

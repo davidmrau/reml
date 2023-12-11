@@ -16,15 +16,15 @@ class DPR:
         sentence_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
         return sentence_embeddings
 
-    def __call__(self, batch):
-        batch = {key: value.to('cuda') for key, value in batch.items()}
-        outputs = self.model(**batch)
+    def __call__(self, kwargs):
+        kwargs = {key: value.to(self.device) for key, value in kwargs.items()}
+        outputs = self.model(**kwargs)
         # pooling over hidden representations
-        emb = self.mean_pooling(outputs[0], batch['attention_mask'])
+        emb = self.mean_pooling(outputs[0], kwargs['attention_mask'])
         return {
                 "embedding": emb
             }
-        
+
     def tokenize(self, example):
         inp =  self.tokenizer(example["sentence"], truncation=True, padding='max_length')
         return inp

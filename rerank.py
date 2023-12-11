@@ -20,7 +20,6 @@ class Rerank():
             # instaniate model
             self.model = CrossEncoder(model_name=self.model_name)
 
- 
     def eval(self, dataset, return_embeddings=False):
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
         q_ids = list()
@@ -34,7 +33,7 @@ class Rerank():
             if return_embeddings:
                 emb = outputs['embedding']
                 embs_list.append(emb)
-            
+
         raise NotImplementedError('check d_ids')
         scores = torch.cat(scores)
         idxs_sorted = self.sort_by_score_indexes(scores)
@@ -67,4 +66,3 @@ class Rerank():
             idxs_sorted.append(idx_sorted)
         idxs_sorted = torch.stack(idxs_sorted)
         return idxs_sorted
-
