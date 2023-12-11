@@ -2,7 +2,6 @@ import datasets
 
 def get_by_ids(dataset, ids):
     idxs = [ dataset.id2index[id_] for id_ in ids]
-    print(dataset[idxs])
     return dataset[idxs]['sentence']
 
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
@@ -12,16 +11,17 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
 
     queries = get_by_ids(dataset['query'], q_ids)
     for i, q_id in enumerate(q_ids):
+        docs = get_by_ids(dataset['doc'], d_ids[i])
         if multi_doc:
-            docs = get_by_ids(dataset['doc'], d_ids[i])
-            if multi_doc:
-                dataset_dict['doc'].append(docs)
-            else:
-                for d_id, doc in zip(d_ids[i], docs):
-                    dataset_dict['d_id'].append(d_id)
-                    dataset_dict['doc'].append(doc)
+            dataset_dict['doc'].append(docs)
             dataset_dict['query'].append(queries[i])
             dataset_dict['q_id'].append(q_id)
+        else:
+            for d_id, doc in zip(d_ids[i], docs):
+                dataset_dict['d_id'].append(d_id)
+                dataset_dict['doc'].append(doc)
+                dataset_dict['query'].append(queries[i])
+                dataset_dict['q_id'].append(q_id)
     return datasets.Dataset.from_dict(dataset_dict)
 
 def print_generate_out(gen_out):

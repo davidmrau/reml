@@ -58,6 +58,7 @@ class Retrieve():
         q_ids = self.datasets['eval']['query']['id']
         q_embs = self.encode(self.datasets['eval']['query'])
         scores = self.sim_dot(q_embs, doc_embs)
+        print('retrieve scores shape', scores.shape)
         if sort_by_score:
             idxs_sorted = self.sort_by_score_indexes(scores)
             # get top-k indices

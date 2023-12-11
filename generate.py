@@ -39,4 +39,4 @@ class Generate():
             instructions += instruction
             generated_response = self.model.generate(instruction)
             responses += generated_response
-        return query_ids, instruction, generated_response
+        return query_ids, instructions, responses
