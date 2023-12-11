@@ -27,7 +27,6 @@ class BM25:
     def index(self, dataset, dataset_path):
         if not os.path.exists(dataset_path):
             os.makedirs(dataset_path)
-        else:
             json_dir = f'{dataset_path}_json/'
             self.save_documents_to_json(dataset, json_dir) 
             self.run_index_process(dataset_path, json_dir)

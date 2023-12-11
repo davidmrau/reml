@@ -74,7 +74,6 @@ class Retrieve():
 
     def retrieve(self, split, return_embeddings=False, sort_by_score=True):
         index_path = self.hash_dataset(split)['doc'] 
-        print(index_path)
         doc_ids = self.datasets[split]['doc']['id']
         q_ids = self.datasets[split]['query']['id']
 

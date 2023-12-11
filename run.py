@@ -27,8 +27,8 @@ def main():
     }
 
     retriever_kwargs = {
-            "model_name": "facebook/contriever",
-            #"model_name": "bm25",
+            #"model_name": "facebook/contriever",
+            "model_name": "bm25",
             "batch_size": 3,
             "batch_size_sim": 8,
             "top_k_documents": 3,
