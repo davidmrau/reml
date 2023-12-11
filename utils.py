@@ -16,6 +16,8 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
     if not multi_doc:
         dataset_dict['d_id'] = []
     assert len(d_ids) == len(q_ids)
+
+
     queries = get_by_ids(dataset['query'], q_ids)
     for i, q_id in enumerate(q_ids):
         docs = get_by_ids(dataset['doc'], d_ids[i])
@@ -31,6 +33,7 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False):
                     dataset_dict['doc'].append(doc)
                     dataset_dict['query'].append(queries[i])
                     dataset_dict['q_id'].append(q_id)
+                    
     return datasets.Dataset.from_dict(dataset_dict)
 
 def print_generate_out(gen_out):

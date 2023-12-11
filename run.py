@@ -28,14 +28,15 @@ def main():
 
     retriever_kwargs = {
             "model_name": "facebook/contriever",
+            #"model_name": "bm25",
             "batch_size": 3,
             "batch_size_sim": 8,
             "top_k_documents": 3,
             }
 
     reranker_kwargs = {
-            "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
-            #"model_name": None,
+            #"model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+            "model_name": None,
             "batch_size": 3,
             "top_k_documents": 2,
             }
@@ -43,6 +44,7 @@ def main():
     generator_kwargs = {
             #"model_name": "meta-llama/Llama-2-7b-chat-hf",
             "model_name": 'dummy',
+           # "model_name": None,
             "batch_size": 1,
             "max_new_tokens": 1024,
             "format_instruction": format_instruction,
@@ -58,9 +60,10 @@ def main():
     }
 
     rag = RAG(**rag_kwargs)
-    out_generate = rag.zero_shot_single_retrieval()
-
-    print_generate_out(out_generate)
+    #rag.retrieve()
+    out_generate = rag.generate_simple()
+    if out_generate != None:
+        print_generate_out(out_generate)
 
 if __name__ == "__main__":
     main()

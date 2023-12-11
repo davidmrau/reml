@@ -15,17 +15,18 @@ class Generate():
         # match model class
         if self.model_name == None:
             self = None
-        elif self.model_name == 'dummy':
-            from models.generators.dummy import Dummy
-            generator_class = Dummy
-        elif self.model_name == 'meta-llama/Llama-2-7b-chat-hf':
-            from models.generators.llama2 import Llama2
-            generator_class = Llama2
         else:
-            raise NotImplementedError(f"Model {self.model_name} not implemented!")
+            if self.model_name == 'dummy':
+                from models.generators.dummy import Dummy
+                generator_class = Dummy
+            elif self.model_name == 'meta-llama/Llama-2-7b-chat-hf':
+                from models.generators.llama2 import Llama2
+                generator_class = Llama2
+            else:
+                raise NotImplementedError(f"Model {self.model_name} not implemented!")
 
-        # instatiate model
-        self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
+            # instatiate model
+            self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
 
     def eval(self, dataset):
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)

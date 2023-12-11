@@ -1,5 +1,4 @@
 from transformers import AutoModel, AutoTokenizer, DefaultDataCollator
-from torch.utils.data import DataLoader
 import torch
 class DPR:
     def __init__(self, model_name=None):
