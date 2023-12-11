@@ -52,7 +52,7 @@ class RAG:
         split = 'eval'
         subset = 'doc'
         # index
-        doc_embs = self.index(split=split, subset=subset)
+        self.index(split=split, subset=subset)
         # retrieve
         out_retrieve = self.retriever.retrieve(split, return_embeddings=False)
         query_ids, doc_ids = out_retrieve['q_id'], out_retrieve['doc_id']
