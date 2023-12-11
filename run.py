@@ -3,21 +3,13 @@ def main():
     from rag import RAG
     from utils import print_generate_out
 
-    experiment_folder = 'experiments'
-    run_name = 'experiment_1'
-
-    dataset = datasets.Dataset.from_dict({'sentence': ['this is the first sentence', 'desktop computer', 'soccer field', 'anatomy the docer', 'a table is set for breakfast']*3, 'id': ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15']})
-    dataset.sentence_field = 'sentence'
-    dataset.id_field = "id"
-
-
+    dataset = datasets.Dataset.load_from_disk('datasets/dummy')
 
     def format_instruction(sample):
         docs_prompt = ''
         for i, doc in enumerate(sample['doc']):
             docs_prompt += f"Document {i}: {doc}\n"
         return f"""### Instructions: Please write a response given the query and support documents:\n### Query: {sample['query']}\n### Documents:{docs_prompt}\n### Response:"""
-
 
     datasets  = {
         "train": {
@@ -60,8 +52,8 @@ def main():
             "retriever_kwargs": retriever_kwargs,
             "reranker_kwargs": reranker_kwargs,
             "generator_kwargs": generator_kwargs,
-            "experiment_folder": experiment_folder,
-            "run_name": run_name,
+            "experiment_folder": 'experiments',
+            "run_name": 'test',
             "datasets": datasets,
     }
 
