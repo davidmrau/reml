@@ -1,9 +1,8 @@
 def main():
-    import datasets
     from rag import RAG
-    from utils import print_generate_out
+    from utils import print_generate_out, get_by_ids
+    import json
 
-    dataset = datasets.Dataset.load_from_disk('datasets/dummy')
 
     def format_instruction(sample):
         docs_prompt = ''
@@ -11,27 +10,31 @@ def main():
             docs_prompt += f"Document {i}: {doc}\n"
         return f"""### Instructions: Please write a response given the query and support documents:\n### Query: {sample['query']}\n### Documents:{docs_prompt}\n### Response:"""
 
-    datasets  = {
+
+    dataset_names  = {
         "train": {
                 "doc": None,
                 "query": None,
             },
-        "eval": {
-                "doc": dataset,
-                "query": dataset,
-            },
         "test": {
+                "doc": ("odqa-wiki-corpora-100w-tamber", "train"),
+                "query": ("nq_open", "validation"),
+            },
+        "dev": {
                 "doc": None,
                 "query": None,
             },
     }
 
+    prebuild_indexes = json.loads(open('config/prebuild_indexes.json').read())
+
     retriever_kwargs = {
             #"model_name": "facebook/contriever",
             "model_name": "bm25",
-            "batch_size": 3,
-            "batch_size_sim": 8,
-            "top_k_documents": 3,
+            "batch_size": 1024,
+            "batch_size_sim": 256,
+            "top_k_documents": 10,
+            "pyserini_num_threads": 10, 
             }
 
     reranker_kwargs = {
@@ -54,9 +57,13 @@ def main():
             "retriever_kwargs": retriever_kwargs,
             "reranker_kwargs": reranker_kwargs,
             "generator_kwargs": generator_kwargs,
-            "experiment_folder": 'experiments',
+            "experiment_folder": '/scratch-shared/drau_experiments',
             "run_name": 'test',
-            "datasets": datasets,
+            "dataset_names": dataset_names,
+            "dataset_folder": '/scratch-shared/drau_datasets/',
+            "processing_num_proc": 30, 
+            "overwrite_datasets": False,
+            "prebuild_indexes": prebuild_indexes,
     }
 
     rag = RAG(**rag_kwargs)
@@ -64,6 +71,7 @@ def main():
     out_generate = rag.generate_simple()
     if out_generate != None:
         print_generate_out(out_generate)
+    print(out_generate['metrics_out'])
 
 if __name__ == "__main__":
     main()

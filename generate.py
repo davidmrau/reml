@@ -28,16 +28,27 @@ class Generate():
             # instatiate model
             self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
 
+    def collate_fn(self, examples):
+        ids = [e['q_id'] for e in examples]
+        instr = [self.format_instruction(e) for e in examples]
+        label = [e['label'] for e in examples]
+        inp_dict = self.model.tokenizer(instr, padding=True, truncation=True, return_tensors="pt", max_length=1024)
+        inp_dict['q_id'] = ids
+        inp_dict['instr'] = instr
+        inp_dict['label']= label
+
+        return inp_dict
+    
     def eval(self, dataset):
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
-        responses = list()
-        instructions = list()
-        query_ids = list()
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.collate_fn)
+        responses, instructions, query_ids, labels = list(), list(), list(), list()
+
         for batch in tqdm(dataloader, desc='Generating'):
             id_ = batch.pop('q_id')
             instruction = batch.pop('instruction')
             query_ids += id_
+            labels.append(batch.pop('label'))
             instructions += instruction
             generated_response = self.model.generate(instruction)
             responses += generated_response
-        return query_ids, instructions, responses
+        return query_ids, instructions, responses, labels

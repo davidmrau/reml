@@ -24,5 +24,5 @@ class Splade:
             }
 
     def tokenize(self, example):
-        inp_dict = self.tokenizer(example["sentence"], truncation=True)
+        inp_dict = self.tokenizer(example["content"], truncation=True)
         return inp_dict

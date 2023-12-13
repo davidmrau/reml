@@ -12,8 +12,8 @@ class DPR:
     # Mean pooling
     def mean_pooling(self, token_embeddings, mask):
         token_embeddings = token_embeddings.masked_fill(~mask[..., None].bool(), 0.)
-        sentence_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
-        return sentence_embeddings
+        content_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
+        return content_embeddings
 
     def __call__(self, kwargs):
         kwargs = {key: value.to(self.device) for key, value in kwargs.items()}
@@ -25,5 +25,5 @@ class DPR:
             }
 
     def tokenize(self, example):
-        inp =  self.tokenizer(example["sentence"], truncation=True, padding='max_length')
+        inp =  self.tokenizer(example["content"], truncation=True, padding='max_length')
         return inp

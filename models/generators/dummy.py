@@ -17,7 +17,7 @@ class Dummy():
     def tokenize(self, example):
         inp_dict = defaultdict()
         inp_dict['id'] = example["id"]
-        inp_dict['sentence'] = example["sentence"]
+        inp_dict['content'] = example["content"]
         return inp_dict
 
     def collate_fn(self, examples):

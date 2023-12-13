@@ -32,18 +32,9 @@ class Llama2():
 
     def tokenize(self, example):
         inp_dict = defaultdict()
-        # inp_dict = self.tokenizer(example[sentence_field], truncation=True)
+        # inp_dict = self.tokenizer(example[content_field], truncation=True)
         inp_dict["id"] = example["id"]
-        inp_dict["sentence"] = example["sentence"]
-        return inp_dict
-
-       
-    def collate_fn(self, examples):
-        ids = [e['q_id'] for e in examples]
-        instr = [self.format_instruction(e) for e in examples]
-        inp_dict = self.model.tokenizer(instr, padding=True, truncation=True, return_tensors="pt", max_length=1024)
-        inp_dict['q_id'] = ids
-        inp_dict['instr'] = instr
+        inp_dict["content"] = example["content"]
         return inp_dict
         
     def generate(self, instr_tokenized):

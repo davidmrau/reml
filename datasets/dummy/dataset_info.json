@@ -2,7 +2,7 @@
   "citation": "",
   "description": "",
   "features": {
-    "sentence": {
+    "content": {
       "dtype": "string",
       "_type": "Value"
     },

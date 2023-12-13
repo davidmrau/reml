@@ -1,81 +1,117 @@
-
 from retrieve import Retrieve
 from rerank import Rerank
 from generate import Generate
 import torch
 from collections import defaultdict
-from utils import make_hf_dataset
+from utils import make_hf_dataset, print_rag_model
+from dataset import ProcessDatasets
+from metric import Metrics
 
 class RAG:
-    def __init__(self, generator_kwargs=None, retriever_kwargs=None, reranker_kwargs=None, experiment_folder=None, run_name=None, datasets=None):
+    def __init__(self, 
+                 generator_kwargs=None, 
+                 retriever_kwargs=None, 
+                 reranker_kwargs=None, 
+                 experiment_folder=None, 
+                 run_name=None, 
+                 dataset_names=None, 
+                 processing_num_proc=1,
+                 dataset_folder='datasets',
+                 overwrite_datasets=False,
+                 prebuild_indexes=defaultdict(dict),
+                ):
 
-        self.datasets = datasets
-
+        self.dataset_folder = dataset_folder
         self.experiment_folder = experiment_folder
         self.run_name = run_name
+        self.processing_num_proc = processing_num_proc
 
-        # add index for lookup by id
-        self.add_idx_to_datsets()
+        metrics = {
+            "train": None, 
+            "test": Metrics(dataset_names['test']['query']), 
+            "dev": None
+        }
 
-        print(':'*100)
-        print('RAG Model:')
+        # process datasets, downloading, loading, covert to format
+        self.datasets = ProcessDatasets.process(
+            dataset_names, 
+            out_dir=self.dataset_folder, 
+            num_proc=processing_num_proc,
+            overwrite=overwrite_datasets,
+            )
+
+        print_rag_model(self, metrics, retriever_kwargs,reranker_kwargs, generator_kwargs)
         # init modules
-        print(f"Loading Retriever: {retriever_kwargs['model_name']}")
-        
-        self.retriever = Retrieve(**retriever_kwargs, datasets=datasets, index_dir='indexes')
-
-        print(f"Loading Reranker: {reranker_kwargs['model_name']}")
+        self.retriever = Retrieve(
+                    **retriever_kwargs, 
+                    datasets=self.datasets, 
+                    index_dir='indexes',
+                    processing_num_proc=processing_num_proc,
+                    prebuild_indexes=prebuild_indexes,
+                    )
         self.reranker = Rerank(**reranker_kwargs)
-
-        print(f"Loading Generator: {generator_kwargs['model_name']}")
         self.generator = Generate(**generator_kwargs)
-        print(':'*100)
-        print()
+
 
     @torch.no_grad()
     def index(self, split, subset):
         self.retriever.index(split, subset)
               
-        
+    
     def retrieve(self):
         # todo save ids in emb perhaps
-        split = 'eval'
-        subset = 'doc'
+        split = 'test'
         # index
-        self.index(split=split, subset=subset)
+        self.index(split=split, subset='doc')
 
         # retrieve
         out_retrieve = self.retriever.retrieve(split, return_embeddings=False)
-        
+        print(out_retrieve)
+
     def generate_simple(self):
         # todo save ids in emb perhaps
-        split = 'eval'
-        subset = 'doc'
+        split = 'test'
         # index
-        self.index(split=split, subset=subset)
+        self.index(split=split, subset='doc')
         # retrieve
-        out_retrieve = self.retriever.retrieve(split, return_embeddings=False)
-        query_ids, doc_ids = out_retrieve['q_id'], out_retrieve['doc_id']
+
+        fetch_pyserini_docs=True
+
+        out_ranking = self.retriever.retrieve(
+            split, 
+            return_embeddings=False,
+            return_docs=fetch_pyserini_docs,
+            )
+        query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
 
         # rerank
         if self.reranker.model != None:
-            rerank_dataset = make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=False)
-            out_rerank = self.reranker.eval(rerank_dataset)
-            query_ids, doc_ids = out_rerank['q_id'], out_rerank['doc_id']
+            rerank_dataset = make_hf_dataset(
+                self.datasets[split], 
+                query_ids, 
+                doc_ids,
+                multi_doc=False,
+                pyserini_docs=docs
+                )
+            
+            out_ranking = self.reranker.eval(rerank_dataset)
+            query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
 
-        gen_dataset = make_hf_dataset(self.datasets[split], query_ids, doc_ids, multi_doc=True)
-        query_ids, instructions, responses  = self.generator.eval(gen_dataset)
+        gen_dataset = make_hf_dataset(
+            self.datasets[split], 
+            query_ids, 
+            doc_ids, 
+            multi_doc=True, 
+            pyserini_docs=docs
+            )
+        query_ids, instructions, responses, labels  = self.generator.eval(gen_dataset)
+
+        metrics_out = self.metrics[split].compute(responses, labels)
+
         return {
                 "instruction": instructions,
                 "response": responses,
-                "q_id": query_ids
+                "q_id": query_ids, 
+                "labels": labels,
+                "metrics": metrics_out
             }
-    
-
-    def add_idx_to_datsets(self):
-        # make mapping from str id to index for easy lookup by id
-        for split in self.datasets:
-            for subset in self.datasets[split]:
-                if self.datasets[split][subset] != None:
-                    self.datasets[split][subset] = self.datasets[split][subset].add_column("index", range(len(self.datasets[split][subset])))
-                    self.datasets[split][subset].id2index = dict(zip(self.datasets[split][subset]["id"], self.datasets[split][subset]["index"]))
