@@ -4,9 +4,10 @@ from tqdm import tqdm
 import os
 import json
 from torch.utils.data import DataLoader
-
+import shutil
 
 class BM25:
+
     def __init__(self, model_name):
         self.model_name = model_name
 
@@ -38,7 +39,6 @@ class BM25:
                 if return_docs:
                     docs.append(q_docs)
                 
-
         return {
             "q_id": q_ids,
             "doc_id": doc_ids, 
@@ -46,22 +46,25 @@ class BM25:
             "doc": docs if return_docs else None
         }
 
-    def index(self, dataset, dataset_path):
+    def index(self, dataset, dataset_path, num_threads=1):
+        print('bm25 indexing called')
         if not os.path.exists(dataset_path):
+            json_folder = f'{dataset_path}_json/'
+            self.save_documents_to_json(dataset, json_folder) 
             os.makedirs(dataset_path)
-            json_dir = f'{dataset_path}_json/'
-            self.save_documents_to_json(dataset, json_dir) 
-            self.run_index_process(dataset_path, json_dir)
+            self.run_index_process(dataset_path, json_folder, num_threads)
+            print('Removing tmp files.')
+            shutil.rmtree(json_folder)
         return 
 
-    def run_index_process(self, out_dir, json_dir):
+    def run_index_process(self, out_folder, json_folder, num_threads):
         command = [
             'python3', '-m', 'pyserini.index.lucene',
             '--collection', 'JsonCollection',
-            '--input', json_dir,
-            '--index', out_dir,
+            '--input', json_folder,
+            '--index', out_folder,
             '--generator', 'DefaultLuceneDocumentGenerator',
-            '--threads', self.num_threads
+            '--threads', str(num_threads)
             # '--storePositions', '--storeDocvectors', '--storeRaw'
         ]
         try:
@@ -70,28 +73,17 @@ class BM25:
             print(f"Error: {e}")
 
 
-    def save_documents_to_json(self, dataset, output_dir, max_per_file=100000):
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        # Split the dataset into chunks
-        contents = [dataset['content'][i:i + max_per_file] for i in range(0, len(dataset), max_per_file)]
-        ids = [dataset['id'][i:i + max_per_file] for i in range(0, len(dataset), max_per_file)]
-        # Save each chunk to a separate JSON file
-        for i, (chunk_id, chunk_sent) in tqdm(enumerate(zip(ids, contents), start=1), desc='Saving dataset to json.'):
-            formatted_chunk = [{"id": id_, "contents": sent} for id_ , sent in zip(chunk_id, chunk_sent)]
-            output_file_path = os.path.join(output_dir, f"doc{i}.json")
-            with open(output_file_path, "w") as output_file:
-                json.dump(formatted_chunk, output_file, indent=2)
-            print(f"Saved {len(formatted_chunk)} documents to {output_file_path}")
-
-
-
-
-# python -m pyserini.index.lucene \
-#   --collection JsonCollection \
-#   --input tests/resources/sample_collection_jsonl \
-#   --index indexes/sample_collection_jsonl \
-#   --generator DefaultLuceneDocumentGenerator \
-#   --threads 1 \
-#   --storePositions --storeDocvectors --storeRaw
+    def save_documents_to_json(self, dataset, output_folder, max_per_file=200000):
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+            # Save each chunk to a separate JSON file
+            for i in tqdm(range(0, len(dataset), max_per_file), desc='Saving dataset to json.'):
+                chunk = dataset[i:i + max_per_file]
+                chunk_id = chunk['id']
+                chunk_sent = chunk['content']
+                formatted_chunk = [{"id": id_, "contents": sent} for id_ , sent in zip(chunk_id, chunk_sent)]
+                output_file_path = os.path.join(output_folder, f"doc{i}.json")
+                with open(output_file_path, "w") as output_file:
+                    json.dump(formatted_chunk, output_file, indent=2)
+        else:
+            print(f'Skipping writing dataset to json because {output_folder} already exists.')

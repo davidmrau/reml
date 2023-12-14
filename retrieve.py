@@ -14,7 +14,7 @@ class Retrieve:
                  batch_size=1, 
                  batch_size_sim=1, 
                  top_k_documents=1, 
-                 index_dir=None, 
+                 index_folder=None, 
                  pyserini_num_threads=1,
                  processing_num_proc=1,
                  prebuild_indexes=None,
@@ -25,7 +25,7 @@ class Retrieve:
         self.batch_size = batch_size
         self.batch_size_sim = batch_size_sim
         self.top_k_documents = top_k_documents
-        self.index_dir = index_dir
+        self.index_folder = index_folder
         self.pyserini_num_threads = pyserini_num_threads
         self.processing_num_proc = processing_num_proc
         # match model class
@@ -55,7 +55,7 @@ class Retrieve:
                 if self.model_name == 'bm25':
                     self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
                 else: 
-                    os.makedirs(self.index_dir, exist_ok=True)
+                    os.makedirs(self.index_folder, exist_ok=True)
                     embs = self.encode(dataset)
                     torch.save(embs.detach().cpu(), index_path)
         return 
@@ -141,7 +141,7 @@ class Retrieve:
         return self.prebuild_indexes[self.model_name].get(dataset_name, None)
     
     def get_index_path(self, split, subset):
-        return f'{self.index_dir}/{self.datasets[split][subset].name}_{split}_{subset}_{self.model_name.split("/")[-1]}'
+        return f'{self.index_folder}/{self.datasets[split][subset].name}_{split}_{subset}_{self.model_name.split("/")[-1]}'
     
 
     def preprocess_datasets(self, datasets):

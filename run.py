@@ -17,7 +17,7 @@ def main():
                 "query": None,
             },
         "test": {
-                "doc": ("odqa-wiki-corpora-100w-tamber", "train"),
+                "doc": ("odqa-wiki-corpora-100w-karpukhin", "train"),
                 "query": ("nq_open", "validation"),
             },
         "dev": {
@@ -58,10 +58,11 @@ def main():
             "retriever_kwargs": retriever_kwargs,
             "reranker_kwargs": reranker_kwargs,
             "generator_kwargs": generator_kwargs,
-            "experiment_folder": '/scratch-shared/drau_experiments',
             "run_name": 'test',
             "dataset_names": dataset_names,
             "dataset_folder": '/scratch-shared/drau_datasets/',
+            "index_folder": '/scratch-shared/drau_indexes/',
+            "experiment_folder": '/scratch-shared/drau_experiments',
             "processing_num_proc": 30, 
             "overwrite_datasets": False,
             "prebuild_indexes": prebuild_indexes,

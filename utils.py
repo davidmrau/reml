@@ -1,4 +1,5 @@
 import datasets
+import random 
 
 def get_by_ids(dataset, ids):
     # if single id is passed cast it to list
@@ -43,21 +44,20 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
                         dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(gen_out, first_n=10):
+def print_generate_out(gen_out, n=10):
     ids, instructions, responses, labels = gen_out['q_id'], gen_out['instruction'], gen_out['response'], gen_out['labels']
-    for i, (id_,instr, response, label) in enumerate(zip(ids, instructions, responses, labels)):
-        if i > first_n:
-            break
+    rand = random.sample(range(len(ids)), n)
+    for i in rand:
         print('_'*50)
-        print('Query ID:', id_)
+        print('Query ID:', ids[i])
         print('_'*50)
         print('Instruction to Generator:')
-        print(instr)
+        print(instructions[i])
         print()
         print('Generated Response:')
-        print(response)
+        print(responses[i])
         print('Label:')
-        print(label)
+        print(labels[i])
         print()
         print()
 

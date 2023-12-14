@@ -49,6 +49,24 @@ class ODQAWikiCorpora100WTamberProcessor:
         return dataset
     
 
+class ODQAWikiCorpora100WKarpukhinProcessor:
+
+    @staticmethod
+    def process(split, num_proc=None):
+        hf_name = 'castorini/odqa-wiki-corpora'
+        hf_subset_name= "wiki-text-100w-karpukhin"
+
+        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
+        def map_fn(example):
+            example['content'] = f"{example['title']}: {example['text']}"
+            return example
+        
+        dataset = dataset.map(map_fn, num_proc=num_proc)
+        dataset = dataset.rename_column("docid", "id")
+        dataset = dataset.remove_columns(['title', 'text'])
+        return dataset
+    
+
 
 class Processor(object):
     
@@ -61,23 +79,25 @@ class Processor(object):
         return dataset
     
     def get_index_to_id(self, dataset):
+        if 'index' not in dataset.features:
+            dataset = self.add_index(dataset)
         return dict(zip(dataset["id"], dataset["index"]))
     
     def get_dataset(self, dataset_name, split):
         print(f'Processing dataset: {dataset_name}')
-        out_dir = f'{self.out_dir}/{dataset_name}_{split}'
-        if os.path.exists(out_dir) and not self.overwrite:
-            dataset = datasets.load_from_disk(out_dir)
-            #id2index = self.tsv_to_dict(f'{out_dir}/id2index.csv')
-            id2index = pickle.load(open(f'{out_dir}/id2index.p', 'rb'))
+        out_folder = f'{self.out_folder}/{dataset_name}_{split}'
+        if os.path.exists(out_folder) and not self.overwrite:
+            dataset = datasets.load_from_disk(out_folder)
+            #id2index = self.tsv_to_dict(f'{out_folder}/id2index.csv')
+            id2index = pickle.load(open(f'{out_folder}/id2index.p', 'rb'))
             dataset.id2index = id2index
         else:
             dataset = self.processors[dataset_name].process(split, num_proc=self.num_proc)
-            dataset.save_to_disk(out_dir)
+            dataset.save_to_disk(out_folder)
             id2index = self.get_index_to_id(dataset) 
             dataset.id2index = id2index
-            pickle.dump(id2index, open(f'{out_dir}/id2index.p', 'wb'))
-            #self.dict_to_tsv(id2index, f'{out_dir}/id2index.csv')
+            pickle.dump(id2index, open(f'{out_folder}/id2index.p', 'wb'))
+            #self.dict_to_tsv(id2index, f'{out_folder}/id2index.csv')
         dataset.name = dataset_name
         
         return dataset
@@ -109,19 +129,20 @@ class Processor(object):
 
 
 class CollectionProcessor(Processor):
-    def __init__(self, out_dir='datasets', num_proc=20, overwrite=False):
+    def __init__(self, out_folder='datasets', num_proc=20, overwrite=False):
         self.num_proc = num_proc
-        self.out_dir = out_dir
+        self.out_folder = out_folder
         self.overwrite = overwrite
         self.processors = {
             "odqa-wiki-corpora-100w-tamber": ODQAWikiCorpora100WTamberProcessor,
+            "odqa-wiki-corpora-100w-karpukhin": ODQAWikiCorpora100WKarpukhinProcessor,
         }
 
 
 class QueryProcessor(Processor):
-    def __init__(self, out_dir='datasets', num_proc=20, overwrite=False):
+    def __init__(self, out_folder='datasets', num_proc=20, overwrite=False):
         self.num_proc = num_proc
-        self.out_dir = out_dir
+        self.out_folder = out_folder
         self.overwrite = overwrite
         self.processors = defaultdict(None)
         self.processors.update({
@@ -133,10 +154,10 @@ class QueryProcessor(Processor):
 
 class ProcessDatasets:
     @staticmethod
-    def process(datasets, out_dir='datasets', num_proc=1, overwrite=False):
+    def process(datasets, out_folder='datasets', num_proc=1, overwrite=False):
         processed_datasets = defaultdict(dict)
-        doc_processor = CollectionProcessor(out_dir=out_dir, num_proc=num_proc, overwrite=overwrite)
-        query_processor = QueryProcessor(out_dir=out_dir, num_proc=num_proc, overwrite=overwrite)
+        doc_processor = CollectionProcessor(out_folder=out_folder, num_proc=num_proc, overwrite=overwrite)
+        query_processor = QueryProcessor(out_folder=out_folder, num_proc=num_proc, overwrite=overwrite)
         for split in datasets:
             for subset in datasets[split]:
                 if datasets[split][subset] != None:

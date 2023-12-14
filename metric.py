@@ -2,7 +2,8 @@ import datasets
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
 import evaluate
-
+import string
+import regex 
 
 def simple_accuracy(preds, labels):
     return float((preds == labels).mean())
@@ -24,9 +25,25 @@ def pearson_and_spearman(preds, labels):
         "spearmanr": spearman_corr,
     }
 
+def normalize(s: str) -> str:
+    def remove_articles(text):
+        return regex.sub(r"\b(a|an|the)\b", " ", text)
+
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
 
 def exact_match_accuracy(references, predictions):
-    return sum([any(p == r_ for r_ in r)for r, p in zip(references, predictions)])/len(references)
+    return sum([any(normalize(p) == normalize(r_) for r_ in r)for r, p in zip(references, predictions)])/len(references)
 
 class Metrics:
     def __init__(self, dataset_name):

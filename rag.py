@@ -13,6 +13,7 @@ class RAG:
                  retriever_kwargs=None, 
                  reranker_kwargs=None, 
                  experiment_folder=None, 
+                 index_folder=None,
                  run_name=None, 
                  dataset_names=None, 
                  processing_num_proc=1,
@@ -25,6 +26,7 @@ class RAG:
         self.experiment_folder = experiment_folder
         self.run_name = run_name
         self.processing_num_proc = processing_num_proc
+        self.index_folder = index_folder
 
         self.metrics = {
             "train": None, 
@@ -35,7 +37,7 @@ class RAG:
         # process datasets, downloading, loading, covert to format
         self.datasets = ProcessDatasets.process(
             dataset_names, 
-            out_dir=self.dataset_folder, 
+            out_folder=self.dataset_folder, 
             num_proc=processing_num_proc,
             overwrite=overwrite_datasets,
             )
@@ -45,17 +47,13 @@ class RAG:
         self.retriever = Retrieve(
                     **retriever_kwargs, 
                     datasets=self.datasets, 
-                    index_dir='indexes',
+                    index_folder=self.index_folder,
                     processing_num_proc=processing_num_proc,
                     prebuild_indexes=prebuild_indexes,
                     )
         self.reranker = Rerank(**reranker_kwargs)
         self.generator = Generate(**generator_kwargs)
 
-
-    @torch.no_grad()
-    def index(self, split, subset):
-        self.retriever.index(split, subset)
               
     
     def retrieve(self):
@@ -72,10 +70,10 @@ class RAG:
         # todo save ids in emb perhaps
         split = 'test'
         # index
-        self.index(split=split, subset='doc')
+        self.retriever.index(split, 'doc')
         # retrieve
 
-        fetch_pyserini_docs=True
+        fetch_pyserini_docs=False
 
         out_ranking = self.retriever.retrieve(
             split, 
@@ -96,7 +94,6 @@ class RAG:
             
             out_ranking = self.reranker.eval(rerank_dataset)
             query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
-
         gen_dataset = make_hf_dataset(
             self.datasets[split], 
             query_ids, 
@@ -105,8 +102,6 @@ class RAG:
             pyserini_docs=docs
             )
         query_ids, instructions, responses, labels  = self.generator.eval(gen_dataset)
-        print(self.metrics)
-        print(self.metrics[split])
         metrics_out = self.metrics[split].compute(predictions=responses, references=labels)
 
         return {
