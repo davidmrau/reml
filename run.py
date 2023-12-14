@@ -51,6 +51,7 @@ def main():
             "batch_size": 1,
             "max_new_tokens": 1024,
             "format_instruction": format_instruction,
+            "max_inp_length": None
             }
 
     rag_kwargs = {
@@ -71,7 +72,7 @@ def main():
     out_generate = rag.generate_simple()
     if out_generate != None:
         print_generate_out(out_generate)
-    print(out_generate['metrics_out'])
+    print(out_generate['metrics'])
 
 if __name__ == "__main__":
     main()

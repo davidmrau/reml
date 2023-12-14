@@ -26,9 +26,9 @@ class RAG:
         self.run_name = run_name
         self.processing_num_proc = processing_num_proc
 
-        metrics = {
+        self.metrics = {
             "train": None, 
-            "test": Metrics(dataset_names['test']['query']), 
+            "test": Metrics(dataset_names['test']['query'][0]), 
             "dev": None
         }
 
@@ -40,7 +40,7 @@ class RAG:
             overwrite=overwrite_datasets,
             )
 
-        print_rag_model(self, metrics, retriever_kwargs,reranker_kwargs, generator_kwargs)
+        print_rag_model(self, retriever_kwargs,reranker_kwargs, generator_kwargs)
         # init modules
         self.retriever = Retrieve(
                     **retriever_kwargs, 
@@ -105,8 +105,9 @@ class RAG:
             pyserini_docs=docs
             )
         query_ids, instructions, responses, labels  = self.generator.eval(gen_dataset)
-
-        metrics_out = self.metrics[split].compute(responses, labels)
+        print(self.metrics)
+        print(self.metrics[split])
+        metrics_out = self.metrics[split].compute(predictions=responses, references=labels)
 
         return {
                 "instruction": instructions,

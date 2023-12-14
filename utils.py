@@ -12,7 +12,7 @@ def get_by_ids(dataset, ids):
 # then constructs hf_dataset out of it
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
     dataset_dict = {'query': [], 'doc': [], 'q_id': []}
-    labels = dataset['query'].features.get('label', None)
+    labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
     if labels!= None:
         dataset_dict['label'] = []
     if not multi_doc:
@@ -62,7 +62,7 @@ def print_generate_out(gen_out, first_n=10):
         print()
 
 
-def print_rag_model(rag, metrics, retriever_kwargs,reranker_kwargs, generator_kwargs):
+def print_rag_model(rag, retriever_kwargs,reranker_kwargs, generator_kwargs):
     print(':'*100)
     print('RAG Model:')
     # init modules

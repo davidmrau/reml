@@ -6,7 +6,11 @@ from ..utils.collator import DataCollatorWithId
 from collections import defaultdict
 
 class Llama2():
-    def __init__(self, model_name=None, max_new_tokens=1, format_instruction=None):
+    def __init__(self, 
+                 model_name=None, 
+                 max_new_tokens=1, 
+                 format_instruction=None
+                 ):
         self.model_name = model_name
         self.format_instruction = format_instruction
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -28,14 +32,6 @@ class Llama2():
         self.model.model.embed_tokens._fill_padding_idx_with_zero()
         self.model.config.use_cache = True
         self.max_new_tokens = max_new_tokens
-
-
-    def tokenize(self, example):
-        inp_dict = defaultdict()
-        # inp_dict = self.tokenizer(example[content_field], truncation=True)
-        inp_dict["id"] = example["id"]
-        inp_dict["content"] = example["content"]
-        return inp_dict
         
     def generate(self, instr_tokenized):
         generated_ids =  self.generator.generate(**instr_tokenized.to(self.device), max_new_tokens=self.max_new_tokens)

@@ -25,34 +25,14 @@ def pearson_and_spearman(preds, labels):
     }
 
 
-def exact_match_accuracy(predictions, references):
-    """
-    Compute exact match accuracy for a list of predictions and references.
+def exact_match_accuracy(references, predictions):
+    return sum([any(p == r_ for r_ in r)for r, p in zip(references, predictions)])/len(references)
 
-    Args:
-    - predictions (List[str]): List of predicted strings.
-    - references (List[List[str]]): List of lists of reference strings (multiple references per prediction).
-
-    Returns:
-    - float: Exact match accuracy.
-    """
-    correct_count = 0
-    total_count = len(predictions)
-
-    for pred, refs in zip(predictions, references):
-        # Check if the predicted string exactly matches any reference string
-        if any(pred == ref for ref in refs):
-            correct_count += 1
-
-    accuracy = correct_count / total_count if total_count > 0 else 0.0
-    return accuracy
-
-class Metrics(evaluate.Metric):
-
+class Metrics:
     def __init__(self, dataset_name):
         self.dataset_name = dataset_name
 
-    def _compute(self, predictions, references):
+    def compute(self, predictions, references):
         if self.dataset_name == "nq_open":
             return {"EM": exact_match_accuracy(references, predictions)}
         else:

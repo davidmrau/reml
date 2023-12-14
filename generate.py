@@ -4,11 +4,18 @@ from tqdm import tqdm
 
 # Generate
 class Generate():
-    def __init__(self, model_name=None, batch_size=1, max_new_tokens=1, format_instruction=None):
+    def __init__(self, 
+                 model_name=None, 
+                 batch_size=1, 
+                 max_new_tokens=1, 
+                 format_instruction=None,
+                 max_inp_length=1024
+                 ):
 
         self.batch_size = batch_size
         self.model_name = model_name
         self.format_instruction = format_instruction
+        self.max_inp_length = max_inp_length
 
         if self.batch_size > 1:
             raise NotImplementedError('Only batch size 1 is implemented yet.')
@@ -32,9 +39,15 @@ class Generate():
         ids = [e['q_id'] for e in examples]
         instr = [self.format_instruction(e) for e in examples]
         label = [e['label'] for e in examples]
-        inp_dict = self.model.tokenizer(instr, padding=True, truncation=True, return_tensors="pt", max_length=1024)
+        inp_dict = self.model.tokenizer(
+            instr, 
+            padding=True, 
+            truncation=True, 
+            return_tensors="pt", 
+            max_length=self.max_inp_length
+            )
         inp_dict['q_id'] = ids
-        inp_dict['instr'] = instr
+        inp_dict['instruction'] = instr
         inp_dict['label']= label
 
         return inp_dict
@@ -47,7 +60,7 @@ class Generate():
             id_ = batch.pop('q_id')
             instruction = batch.pop('instruction')
             query_ids += id_
-            labels.append(batch.pop('label'))
+            labels += batch.pop('label')
             instructions += instruction
             generated_response = self.model.generate(instruction)
             responses += generated_response
