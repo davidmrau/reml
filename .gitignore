@@ -1,3 +1,5 @@
 *._*
 experiments/
 *__pycache__*
+datasets/
+indexes/
