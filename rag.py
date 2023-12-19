@@ -3,7 +3,7 @@ from rerank import Rerank
 from generate import Generate
 import torch
 from collections import defaultdict
-from utils import make_hf_dataset, print_rag_model
+from utils import make_hf_dataset, print_rag_model, print_generate_out
 from dataset_processor import ProcessDatasets
 from metric import Metrics
 
@@ -80,7 +80,11 @@ class RAG:
             return_embeddings=False,
             return_docs=fetch_pyserini_docs,
             )
+        
         query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
+        if self.reranker == self.generator == None:
+            print(out_ranking)
+            return out_ranking
 
         # rerank
         if self.reranker !=  None:
@@ -94,21 +98,24 @@ class RAG:
             
             out_ranking = self.reranker.eval(rerank_dataset)
             query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
-        
-        gen_dataset = make_hf_dataset(
-            self.datasets[split], 
-            query_ids, 
-            doc_ids, 
-            multi_doc=True, 
-            pyserini_docs=docs
-            )
-        query_ids, queries, instructions, responses, labels  = self.generator.eval(gen_dataset)
-        metrics_out = self.metrics[split].compute(predictions=responses, references=labels, questions=queries)
+       
+        if self.generator != None: 
+            gen_dataset = make_hf_dataset(
+                self.datasets[split], 
+                query_ids, 
+                doc_ids, 
+                multi_doc=True, 
+                pyserini_docs=docs
+                )
+            query_ids, queries, instructions, responses, labels  = self.generator.eval(gen_dataset)
+            metrics_out = self.metrics[split].compute(predictions=responses, references=labels, questions=queries)
 
-        return {
-                "instruction": instructions,
-                "response": responses,
-                "q_id": query_ids, 
-                "labels": labels,
-                "metrics": metrics_out
-            }
+            out_dict =  {
+                    "instruction": instructions,
+                    "response": responses,
+                    "q_id": query_ids, 
+                    "labels": labels,
+                    "metrics": metrics_out
+                }
+            print_generate_out(out_dict)
+            return out_dict

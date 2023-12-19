@@ -11,7 +11,6 @@ else:
 def main(config):
     print(OmegaConf.to_yaml(config))
     from rag import RAG
-    from utils import print_generate_out
     import json
 
 
@@ -28,11 +27,6 @@ def main(config):
 
 
     rag = RAG(**config)
-    #rag.retrieve()
     out_generate = rag.generate_simple()
-    if out_generate != None:
-        print_generate_out(out_generate)
-    print(out_generate['metrics'])
-
 if __name__ == "__main__":
     main()
