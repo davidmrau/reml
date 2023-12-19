@@ -15,7 +15,6 @@ class Retrieve:
                  top_k_documents=1, 
                  index_folder=None, 
                  pyserini_num_threads=1,
-                 processing_num_proc=1,
                  ):
         
         self.model_name = model_name
@@ -24,7 +23,6 @@ class Retrieve:
         self.top_k_documents = top_k_documents
         self.index_folder = index_folder
         self.pyserini_num_threads = pyserini_num_threads
-        self.processing_num_proc = processing_num_proc
         # match model class
         if self.model_name == 'splade':
             from models.retrievers.splade import Splade
@@ -179,7 +177,7 @@ class Retrieve:
                         else: 
                             dataset = datasets[split][subset]
                             # apply tokenizer 
-                            dataset = dataset.map(self.tokenize, batched=True, num_proc=self.processing_num_proc, desc=f'Processing dataset {split} {subset} for {self.model_name}')
+                            dataset = dataset.map(self.tokenize, batched=True, desc=f'Processing dataset {split} {subset} for {self.model_name}')
                             # remove all non-model input fields
                             dataset = dataset.remove_columns(['content'])
                             dataset.save_to_disk(index_folder)

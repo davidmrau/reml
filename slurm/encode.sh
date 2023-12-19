@@ -11,6 +11,7 @@
 source ~/.bashrc
 port=$(shuf -i 29500-29599 -n 1)
 nvidia-smi
+cd ..
 python3 run.py +run_name='encode'
 
  

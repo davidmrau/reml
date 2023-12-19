@@ -50,7 +50,6 @@ class RAG:
                     **retriever_config, 
                     datasets=self.datasets, 
                     index_folder=self.index_folder,
-                    processing_num_proc=processing_num_proc,
                     ) if retriever_config != None else None
         self.reranker = Rerank(**reranker_config) if reranker_config != None else None
         self.generator = Generate(**generator_config) if generator_config != None else None
