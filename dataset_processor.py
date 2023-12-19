@@ -20,7 +20,7 @@ class NQOpenProcessor:
         dataset = datasets.load_dataset(hf_name, num_proc=num_proc)[split]
 
 
-        dataset = dataset.map(lambda example, idx: {'id': str(idx), **example}, with_indices=True, desc=f"Processing dataset {hf_name}")
+        dataset = dataset.map(lambda example, idx: {'id': str(idx), **example}, with_indices=True)
 
         dataset = dataset.rename_column("answer", "label")
         dataset = dataset.rename_column("question", "content")
@@ -41,9 +41,9 @@ class ODQAWikiCorpora100WTamberProcessor:
         dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
         def map_fn(example):
             example['content'] = f"{example['title']}: {example['text']}"
-            return example
+            return examplE
         
-        dataset = dataset.map(map_fn, num_proc=num_proc, desc=f'Processing dataset {hf_name}')
+        dataset = dataset.map(map_fn, num_proc=num_proc)
         dataset = dataset.rename_column("docid", "id")
         dataset = dataset.remove_columns(['title', 'text'])
         return dataset
@@ -56,7 +56,7 @@ class ODQAWikiCorpora100WKarpukhinProcessor:
         hf_name = 'castorini/odqa-wiki-corpora'
         hf_subset_name= "wiki-text-100w-karpukhin"
 
-        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc, 'Processing dataset {hf_name}')[split]
+        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
         def map_fn(example):
             example['content'] = f"{example['title']}: {example['text']}"
             return example

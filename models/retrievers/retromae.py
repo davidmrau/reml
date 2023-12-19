@@ -7,8 +7,6 @@ class RetroMAE:
         self.model = AutoModel.from_pretrained(self.model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(self.model)
-        print(self.device)
         self.model = self.model.to(self.device)
         self.collate_fn = DefaultDataCollator()
 

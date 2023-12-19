@@ -43,25 +43,43 @@ class Retrieve:
         # instaniate model
         self.model = retriever_class(model_name=self.model_name)
         # preprocess dataset on init
+        self.datasets = datasets
         self.datasets = self.preprocess_datasets(datasets)
 
     def index(self, split, subset):
+        print(self.datasets)
         dataset = self.datasets[split][subset]
-        index_path = self.get_index_path(subset)
+        index_path = self.get_index_path(split, subset)
         # if dataset has not been encoded before
         if not os.path.exists(index_path):
             if self.model_name == 'bm25':
                 self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
             else: 
                 os.makedirs(self.index_folder, exist_ok=True)
-                self.encode(dataset, index_path)
+                embs = self.encode(dataset)
+                self.save_index(embs, index_path)
+    
+    @torch.no_grad 
+    def save_index(embs, index_path):
+        embs = embs.detach().cpu()
+        chunk_size = 250000  # Set the size of each chunk
+        num_chunks = embedding.size(0) // chunk_size + 1
+
+        for i in range(num_chunks):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, embedding.size(0))
+            chunk_embedding = embedding[start_idx:end_idx, :] 
+            # Save each chunk
+            chunk_save_path = self.get_chunk_path(index_path, chunk)
+            torch.save(chunk_embedding, chunk_save_path)
+        
     @torch.no_grad()
     def retrieve(self, split, return_embeddings=False, sort_by_score=True, return_docs=False):
         dataset = self.datasets[split]
         doc_ids = dataset['doc']['id']
         q_ids = dataset['query']['id']
         if self.model_name == "bm25":
-            index_path = self.get_index_path('doc')
+            index_path = self.get_index_path(split, 'doc')
             bm25_out = self.model(
                 dataset['query'], 
                 index_path=index_path, 
@@ -99,12 +117,13 @@ class Retrieve:
         num_emb_files = len(glob.glob(f'{index_path}/*.pt'))
         embs = list()
         for i in range(num_emb_files):
-            emb = torch.load(f"{index_path}/embedding_batch_{i}.pt")
+            chunk_path = self.get_chunk_path(index_path, i)
+            emb = torch.load(chunk_path)
             embs.append(emb)
         embs = torch.concat(embs, dim=1)
         return embs.to(self.model.device)
             
-    def encode(self, dataset, index_path=None):
+    def encode(self, dataset):
         dataloader = DataLoader(
             dataset, 
             batch_size=self.batch_size, 
@@ -114,12 +133,7 @@ class Retrieve:
         for i, batch in tqdm(enumerate(dataloader, desc=f'Encoding: {self.model_name}')):
             outputs = self.model(batch)
             emb = outputs['embedding']
-            if index_path != None:
-                embs_list.append(emb)
-            else:
-                batch_save_path = f'{index_path}/embedding_batch_{i}.pt'
-                torch.save(emb.detach().cpu(), batch_save_path)
-        if index_path != None:
+            embs_list.append(emb)
             embs = torch.cat(embs_list)
             return embs
         
@@ -132,13 +146,13 @@ class Retrieve:
         idxs_sorted = torch.stack(idxs_sorted)
         return idxs_sorted
 
+    @torch.no_grad
     def sim_dot(self, emb_q, emb_doc):
         scores = list()
-        with torch.inference_mode():
-            # !! perhaps OOM for very large corpora, might need to be batched for documents as well
-            for emb_q_single in emb_q:
-                scores_q = torch.matmul(emb_q_single, emb_doc.t())
-                scores.append(scores_q)
+        # !! perhaps OOM for very large corpora, might need to be batched for documents as well
+        for emb_q_single in emb_q:
+            scores_q = torch.matmul(emb_q_single, emb_doc.t())
+            scores.append(scores_q)
         scores = torch.stack(scores)
         return scores
 
@@ -146,48 +160,29 @@ class Retrieve:
        return self.model.tokenize(example)
     
     
-    def get_index_path(self, subset):
+    def get_index_path(self, split, subset):
         return f'{self.index_folder}/{self.datasets[split][subset].name}_{subset}_{self.model_name.split("/")[-1]}'
     
+    def get_chunk_path(self, index_path, chunk):
+        return f'{index_path}/embedding_chunk_{chunk + 1}.pt'
 
     def preprocess_datasets(self, datasets):
-        datasets = datasets
         # copy dataset to retriever class and tokenize when not using bm25
         # only tokenize if not using bm25
         if self.model_name != 'bm25':
-            print(f'Processing datasets for Retriever...')
             for split in datasets:
                 for subset in datasets[split]:
                     if datasets[split][subset] != None:
-                        # apply tokenizer 
-                        datasets[split][subset] = datasets[split][subset].map(self.tokenize, batched=True, num_proc=self.processing_num_proc)
-                        # remove all non-model input fields
-                        datasets[split][subset] = datasets[split][subset].remove_columns(['sentence', 'index'])
-
+                        index_folder = self.get_index_path(split, subset)
+                        if os.path.exists(index_folder):
+                            dataset = datasets.Dataset.load_from_disk(index_folder)
+                        else: 
+                            dataset = datasets[split][subset]
+                            # apply tokenizer 
+                            dataset = dataset.map(self.tokenize, batched=True, num_proc=self.processing_num_proc, desc=f'Processing dataset {split} {subset} for {self.model_name}')
+                            # remove all non-model input fields
+                            dataset = dataset.remove_columns(['content'])
+                            dataset.save_to_disk(index_folder)
+                        datasets[split][subset] = dataset
+         
         return datasets
-
-    # code in case dot product between query and all docs leads to OOM, needs to be revised!!
-    def sim_dot_batch(self, q_emb_dataset, doc_emb_dataset, batch_size):
-        raise NotImplementedError('this code is wrong and not finished!')
-        dataloader_doc = DataLoader(doc_emb_dataset, batch_size=batch_size, shuffle=False)
-        # Iterate through document embeddings batches
-        scores_list = []
-        print(len(dataloader_doc))
-        for doc_emb in dataloader_doc:
-            dataloader_queries = DataLoader(q_emb_dataset, batch_size=batch_size, shuffle=False)
-            print(len(dataloader_queries))
-            for q_emb in dataloader_queries:
-                with torch.inference_mode():
-                    batch_score = torch.matmul(q_emb.transpose(0,), doc_emb.t())
-    
-                scores_list.append(batch_score)
-    
-        # Concatenate results to obtain the final dot product matrix
-        scores = torch.cat(scores_list)
-    
-        return scores
-
-
-
-
-
