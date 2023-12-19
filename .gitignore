@@ -4,3 +4,4 @@ experiments/
 datasets/
 indexes/
 outputs/
+slurm/logs/
