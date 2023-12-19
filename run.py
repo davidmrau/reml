@@ -1,4 +1,5 @@
 import hydra
+from multiprocess import set_start_method
 from omegaconf import OmegaConf
 import os
 
@@ -7,12 +8,11 @@ if 'CONFIG_NAME' in  os.environ:
 else:
     CONFIG_NAME = 'rag'
 
-@hydra.main(config_path="config", config_name=CONFIG_NAME)
+@hydra.main(config_path="config", config_name=CONFIG_NAME, version_base="1.2")
 def main(config):
     print(OmegaConf.to_yaml(config))
     from rag import RAG
     import json
-
 
     # make experiment_dir
     run_folder = f"{config.experiment_folder}/{config.run_name}"
@@ -29,4 +29,7 @@ def main(config):
     rag = RAG(**config)
     out_generate = rag.generate_simple()
 if __name__ == "__main__":
+    # needed for multiprocessing to avoid CUDA forked processes erro
+    # https://huggingface.co/docs/datasets/main/en/process#multiprocessing
+    set_start_method("spawn")
     main()

@@ -3,7 +3,6 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch
 from collections import defaultdict
-from datasets.fingerprint import Hasher
 import os 
 from shutil import rmtree
 
@@ -33,6 +32,9 @@ class Retrieve:
         elif self.model_name == 'bm25':
             from models.retrievers.bm25 import BM25
             retriever_class = BM25
+        elif self.model_name == 'retromae':
+            from models.retrievers.retromae import RetroMAE
+            retriever_class = RetroMAE
         else:
             #raise ValueError(f"Model {kwargs['model_name']} not implemented!")
             from models.retrievers.dpr import DPR
@@ -45,22 +47,21 @@ class Retrieve:
 
     def index(self, split, subset):
         dataset = self.datasets[split][subset]
-        index_path = self.get_index_path(split, subset)
+        index_path = self.get_index_path(subset)
         # if dataset has not been encoded before
         if not os.path.exists(index_path):
             if self.model_name == 'bm25':
                 self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
             else: 
                 os.makedirs(self.index_folder, exist_ok=True)
-                embs = self.encode(dataset)
-                torch.save(embs.detach().cpu(), index_path)
+                self.encode(dataset, index_path)
     @torch.no_grad()
     def retrieve(self, split, return_embeddings=False, sort_by_score=True, return_docs=False):
         dataset = self.datasets[split]
         doc_ids = dataset['doc']['id']
         q_ids = dataset['query']['id']
         if self.model_name == "bm25":
-            index_path = self.get_index_path(split, 'doc')
+            index_path = self.get_index_path('doc')
             bm25_out = self.model(
                 dataset['query'], 
                 index_path=index_path, 
@@ -72,7 +73,7 @@ class Retrieve:
             
             return bm25_out
         else:
-            doc_embs = torch.load(index_path).to(self.model.device)
+            doc_embs = self.load_index(index_path)
             q_embs = self.encode(dataset['query'])
             scores = self.sim_dot(q_embs, doc_embs)
             if sort_by_score:
@@ -94,19 +95,34 @@ class Retrieve:
                 "doc_id": doc_ids
                 }
 
-    def encode(self, dataset):
+    def load_index(self, index_path):
+        num_emb_files = len(glob.glob(f'{index_path}/*.pt'))
+        embs = list()
+        for i in range(num_emb_files):
+            emb = torch.load(f"{index_path}/embedding_batch_{i}.pt")
+            embs.append(emb)
+        embs = torch.concat(embs, dim=1)
+        return embs.to(self.model.device)
+            
+    def encode(self, dataset, index_path=None):
         dataloader = DataLoader(
             dataset, 
             batch_size=self.batch_size, 
             collate_fn=self.model.collate_fn
             )
         embs_list = list()
-        for batch in tqdm(dataloader, desc=f'Encoding: {self.model_name}'):
+        for i, batch in tqdm(enumerate(dataloader, desc=f'Encoding: {self.model_name}')):
             outputs = self.model(batch)
             emb = outputs['embedding']
-            embs_list.append(emb)
-        embs = torch.cat(embs_list)
-        return embs
+            if index_path != None:
+                embs_list.append(emb)
+            else:
+                batch_save_path = f'{index_path}/embedding_batch_{i}.pt'
+                torch.save(emb.detach().cpu(), batch_save_path)
+        if index_path != None:
+            embs = torch.cat(embs_list)
+            return embs
+        
     
     def sort_by_score_indexes(self, scores):
         idxs_sorted = list()
@@ -130,7 +146,7 @@ class Retrieve:
        return self.model.tokenize(example)
     
     
-    def get_index_path(self, split, subset):
+    def get_index_path(self, subset):
         return f'{self.index_folder}/{self.datasets[split][subset].name}_{subset}_{self.model_name.split("/")[-1]}'
     
 

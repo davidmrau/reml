@@ -34,15 +34,15 @@ class RAG:
             "test": Metrics(dataset_config['test']['query'][0]), 
             "dev": None
         }
-
-        # process datasets, downloading, loading, covert to format
-        self.datasets = ProcessDatasets.process(
-            dataset_config, 
-            out_folder=self.dataset_folder, 
-            num_proc=processing_num_proc,
-            overwrite=overwrite_datasets,
-            debug=debug,
-            )
+        with torch.no_grad(): 
+            # process datasets, downloading, loading, covert to format
+            self.datasets = ProcessDatasets.process(
+                dataset_config, 
+                out_folder=self.dataset_folder, 
+                num_proc=processing_num_proc,
+                overwrite=overwrite_datasets,
+                debug=debug,
+                )
 
         print_rag_model(self, retriever_config,reranker_config, generator_config)
         # init modules
@@ -57,7 +57,6 @@ class RAG:
 
                
     def retrieve(self):
-        # todo save ids in emb perhaps
         split = 'test'
         # index
         self.retriever.index(split=split, subset='doc')
@@ -67,7 +66,6 @@ class RAG:
         print(out_retrieve)
 
     def generate_simple(self):
-        # todo save ids in emb perhaps
         split = 'test'
         # index
         self.retriever.index(split, 'doc')

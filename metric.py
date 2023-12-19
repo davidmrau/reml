@@ -6,7 +6,6 @@ import string
 import regex 
 import numpy as np
 
-from evaluation.bem import BEM
 
 def simple_accuracy(preds, labels):
     return float((preds == labels).mean())
@@ -73,9 +72,11 @@ def exact_match_score(predictions, references):
 
 
 class Metrics:
-    def __init__(self, dataset_name):
+    def __init__(self, dataset_name, bem=False):
         self.dataset_name = dataset_name
-        self.bem = BEM()
+        if bem:
+            from evaluation.bem import BEM
+            self.bem = BEM()
 
     def compute(self, predictions, references, questions=None):
         if self.dataset_name == "nq_open":
