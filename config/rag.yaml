@@ -1,0 +1,19 @@
+# main_config.yaml
+
+defaults:
+    - retriever_config: bm25
+    - reranker_config: null
+    - generator_config: llama-2-7b-chat
+    - dataset_config: nq_open
+
+run_name: ???
+dataset_folder: 'datasets/'
+index_folder: 'indexes/'
+experiment_folder: 'experiments/'
+processing_num_proc: 30
+overwrite_datasets: false
+debug: false
+
+hydra:
+    job:
+        chdir: False

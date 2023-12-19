@@ -13,12 +13,9 @@ class Rerank():
         self.top_k_documents = top_k_documents
 
         # init model
-        if self.model_name == None:
-            self.model = None
-        else:
-            from models.rerankers.crossencoder import CrossEncoder
-            # instaniate model
-            self.model = CrossEncoder(model_name=self.model_name)
+        from models.rerankers.crossencoder import CrossEncoder
+        # instaniate model
+        self.model = CrossEncoder(model_name=self.model_name)
 
     def eval(self, dataset, return_embeddings=False):
         # get dataloader

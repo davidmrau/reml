@@ -11,10 +11,11 @@ def get_by_ids(dataset, ids):
 
 # gets q_ids and d_ids and does a lookup by id to get the content
 # then constructs hf_dataset out of it
+# pyserini_docs=True documents have been returned by bm25 and don't contents don't need to be fetched
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
     dataset_dict = {'query': [], 'doc': [], 'q_id': []}
     labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
-    if labels!= None:
+    if labels != None:
         dataset_dict['label'] = []
     if not multi_doc:
         dataset_dict['d_id'] = []
@@ -22,6 +23,7 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
 
     queries = get_by_ids(dataset['query'], q_ids)
     for i, q_id in enumerate(q_ids):
+        
         if pyserini_docs == None:
             docs = get_by_ids(dataset['doc'], d_ids[i])
         else:
@@ -44,16 +46,16 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
                         dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(gen_out, n=10):
+def print_generate_out(gen_out, n=3):
     ids, instructions, responses, labels = gen_out['q_id'], gen_out['instruction'], gen_out['response'], gen_out['labels']
     rand = random.sample(range(len(ids)), n)
     for i in rand:
         print('_'*50)
         print('Query ID:', ids[i])
         print('_'*50)
-        print('Instruction to Generator:')
-        print(instructions[i])
-        print()
+        #print('Instruction to Generator:')
+        #print(instructions[i])
+        #print()
         print('Generated Response:')
         print(responses[i])
         print('Label:')
@@ -66,9 +68,13 @@ def print_rag_model(rag, retriever_kwargs,reranker_kwargs, generator_kwargs):
     print(':'*100)
     print('RAG Model:')
     # init modules
-    print(f"Retriever: {retriever_kwargs['model_name']}")
-    print(f"Reranker: {reranker_kwargs['model_name']}")
-    print(f"Generator: {generator_kwargs['model_name']}")
+    if retriever_kwargs != None:
+        print(f"Retriever: {retriever_kwargs['model_name']}")
+    if reranker_kwargs != None:
+        print(f"Reranker: {reranker_kwargs['model_name']}")
+    if generator_kwargs != None:
+        print(f"Generator: {generator_kwargs['model_name']}")
+
     print(':'*100)
     print()
 

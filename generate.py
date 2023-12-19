@@ -19,26 +19,23 @@ class Generate():
 
         if self.batch_size > 1:
             raise NotImplementedError('Only batch size 1 is implemented yet.')
-        # match model class
-        if self.model_name == None:
-            self = None
+        if self.model_name == 'dummy':
+            from models.generators.dummy import Dummy
+            generator_class = Dummy
+        elif self.model_name == 'meta-llama/Llama-2-7b-chat-hf':
+            from models.generators.llama2 import Llama2
+            generator_class = Llama2
         else:
-            if self.model_name == 'dummy':
-                from models.generators.dummy import Dummy
-                generator_class = Dummy
-            elif self.model_name == 'meta-llama/Llama-2-7b-chat-hf':
-                from models.generators.llama2 import Llama2
-                generator_class = Llama2
-            else:
-                raise NotImplementedError(f"Model {self.model_name} not implemented!")
+            raise NotImplementedError(f"Model {self.model_name} not implemented!")
 
-            # instatiate model
-            self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
+        # instatiate model
+        self.model = generator_class(model_name=self.model_name, max_new_tokens=max_new_tokens, format_instruction=format_instruction)
 
     def collate_fn(self, examples):
         ids = [e['q_id'] for e in examples]
         instr = [self.format_instruction(e) for e in examples]
         label = [e['label'] for e in examples]
+        query = [e['query'] for e in examples]
         inp_dict = self.model.tokenizer(
             instr, 
             padding=True, 
@@ -48,20 +45,23 @@ class Generate():
             )
         inp_dict['q_id'] = ids
         inp_dict['instruction'] = instr
+        inp_dict['query'] = query
         inp_dict['label']= label
 
         return inp_dict
     
     def eval(self, dataset):
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.collate_fn)
-        responses, instructions, query_ids, labels = list(), list(), list(), list()
+        responses, instructions, query_ids, queries, labels = list(), list(), list(), list(), list()
 
         for batch in tqdm(dataloader, desc='Generating'):
             id_ = batch.pop('q_id')
             instruction = batch.pop('instruction')
             query_ids += id_
-            labels += batch.pop('label')
+            label = batch.pop('label')
+            labels += label
+            queries += batch.pop('query')
             instructions += instruction
-            generated_response = self.model.generate(instruction)
+            generated_response = self.model.generate(batch)
             responses += generated_response
-        return query_ids, instructions, responses, labels
+        return query_ids, queries, instructions, responses, labels

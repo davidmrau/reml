@@ -6,3 +6,6 @@ wandb
 hydra-core
 evaluate
 pyserini
+tensorflow_hub
+tensorflow
+omegaconf

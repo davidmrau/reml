@@ -4,6 +4,9 @@ from sklearn.metrics import f1_score, matthews_corrcoef
 import evaluate
 import string
 import regex 
+import numpy as np
+
+from evaluation.bem import BEM
 
 def simple_accuracy(preds, labels):
     return float((preds == labels).mean())
@@ -42,16 +45,45 @@ def normalize(s: str) -> str:
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def exact_match_accuracy(references, predictions):
-    return sum([any(normalize(p) == normalize(r_) for r_ in r)for r, p in zip(references, predictions)])/len(references)
+
+def f1(prediction, ground_truth):
+    prediction_tokens = prediction.split()
+    ground_truth_tokens = ground_truth.split()
+    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+    num_same = sum(common.values())
+
+    if num_same == 0:
+        return 0
+    precision = 1.0 * num_same / len(prediction_tokens)
+    recall = 1.0 * num_same / len(ground_truth_tokens)
+    f1 = (2 * precision * recall) / (precision + recall)
+    return f1
+
+def f1_score(predictions, references):
+    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, predicition in zip(references, predicions)])
+
+def em(prediction, ground_truth):
+    print(prediction, ground_truth)
+    return float(normalize(prediction) == normalize(ground_truth))
+
+
+def exact_match_score(predictions, references):
+    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
+
+
 
 class Metrics:
     def __init__(self, dataset_name):
         self.dataset_name = dataset_name
+        self.bem = BEM()
 
-    def compute(self, predictions, references):
+    def compute(self, predictions, references, questions=None):
         if self.dataset_name == "nq_open":
-            return {"EM": exact_match_accuracy(references, predictions)}
+            return {
+                        "EM": exact_match_score(predictions, references),
+                        "BEM": self.bem(references, predictions, questions),
+                        "f1": f1_score(predictions, references),
+                    }
         else:
             raise KeyError()
 

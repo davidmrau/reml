@@ -1,0 +1,9 @@
+train:
+    doc: null
+    query: null
+test:
+    doc: ["odqa-wiki-corpora-100w-karpukhin", "train"]
+    query: ["nq_open", "validation"]
+dev:
+    doc: null
+    query: null

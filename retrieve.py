@@ -17,10 +17,8 @@ class Retrieve:
                  index_folder=None, 
                  pyserini_num_threads=1,
                  processing_num_proc=1,
-                 prebuild_indexes=None,
                  ):
         
-        self.prebuild_indexes = prebuild_indexes
         self.model_name = model_name
         self.batch_size = batch_size
         self.batch_size_sim = batch_size_sim
@@ -47,23 +45,18 @@ class Retrieve:
 
     def index(self, split, subset):
         dataset = self.datasets[split][subset]
-        prebuild_index_name = self.get_prebuild_index_name(dataset.name)
-        if prebuild_index_name == None:
-            index_path = self.get_index_path(split, subset)
-            # if dataset has not been encoded before
-            if not os.path.exists(index_path):
-                if self.model_name == 'bm25':
-                    self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
-                else: 
-                    os.makedirs(self.index_folder, exist_ok=True)
-                    embs = self.encode(dataset)
-                    torch.save(embs.detach().cpu(), index_path)
-        return 
-
+        index_path = self.get_index_path(split, subset)
+        # if dataset has not been encoded before
+        if not os.path.exists(index_path):
+            if self.model_name == 'bm25':
+                self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
+            else: 
+                os.makedirs(self.index_folder, exist_ok=True)
+                embs = self.encode(dataset)
+                torch.save(embs.detach().cpu(), index_path)
     @torch.no_grad()
     def retrieve(self, split, return_embeddings=False, sort_by_score=True, return_docs=False):
         dataset = self.datasets[split]
-        prebuild_index_name = self.get_prebuild_index_name(dataset['doc'].name)
         doc_ids = dataset['doc']['id']
         q_ids = dataset['query']['id']
         if self.model_name == "bm25":
@@ -72,7 +65,6 @@ class Retrieve:
                 dataset['query'], 
                 index_path=index_path, 
                 top_k_documents=self.top_k_documents, 
-                prebuild_index=prebuild_index_name, 
                 batch_size=self.batch_size, 
                 num_threads=self.pyserini_num_threads,
                 return_docs=return_docs,
@@ -137,11 +129,9 @@ class Retrieve:
     def tokenize(self, example):
        return self.model.tokenize(example)
     
-    def get_prebuild_index_name(self, dataset_name):
-        return self.prebuild_indexes[self.model_name].get(dataset_name, None)
     
     def get_index_path(self, split, subset):
-        return f'{self.index_folder}/{self.datasets[split][subset].name}_{split}_{subset}_{self.model_name.split("/")[-1]}'
+        return f'{self.index_folder}/{self.datasets[split][subset].name}_{subset}_{self.model_name.split("/")[-1]}'
     
 
     def preprocess_datasets(self, datasets):

@@ -4,22 +4,22 @@ from generate import Generate
 import torch
 from collections import defaultdict
 from utils import make_hf_dataset, print_rag_model
-from dataset import ProcessDatasets
+from dataset_processor import ProcessDatasets
 from metric import Metrics
 
 class RAG:
     def __init__(self, 
-                 generator_kwargs=None, 
-                 retriever_kwargs=None, 
-                 reranker_kwargs=None, 
+                 generator_config=None, 
+                 retriever_config=None, 
+                 reranker_config=None, 
                  experiment_folder=None, 
                  index_folder=None,
                  run_name=None, 
-                 dataset_names=None, 
+                 dataset_config=None, 
                  processing_num_proc=1,
-                 dataset_folder='datasets',
+                 dataset_folder=None,
                  overwrite_datasets=False,
-                 prebuild_indexes=defaultdict(dict),
+                debug=False,
                 ):
 
         self.dataset_folder = dataset_folder
@@ -29,38 +29,38 @@ class RAG:
         self.index_folder = index_folder
 
         self.metrics = {
-            "train": None, 
-            "test": Metrics(dataset_names['test']['query'][0]), 
+            "train": None,
+            # lookup metric with dataset name (tuple: dataset_name, split) 
+            "test": Metrics(dataset_config['test']['query'][0]), 
             "dev": None
         }
 
         # process datasets, downloading, loading, covert to format
         self.datasets = ProcessDatasets.process(
-            dataset_names, 
+            dataset_config, 
             out_folder=self.dataset_folder, 
             num_proc=processing_num_proc,
             overwrite=overwrite_datasets,
+            debug=debug,
             )
 
-        print_rag_model(self, retriever_kwargs,reranker_kwargs, generator_kwargs)
+        print_rag_model(self, retriever_config,reranker_config, generator_config)
         # init modules
         self.retriever = Retrieve(
-                    **retriever_kwargs, 
+                    **retriever_config, 
                     datasets=self.datasets, 
                     index_folder=self.index_folder,
                     processing_num_proc=processing_num_proc,
-                    prebuild_indexes=prebuild_indexes,
-                    )
-        self.reranker = Rerank(**reranker_kwargs)
-        self.generator = Generate(**generator_kwargs)
+                    ) if retriever_config != None else None
+        self.reranker = Rerank(**reranker_config) if reranker_config != None else None
+        self.generator = Generate(**generator_config) if generator_config != None else None
 
-              
-    
+               
     def retrieve(self):
         # todo save ids in emb perhaps
         split = 'test'
         # index
-        self.index(split=split, subset='doc')
+        self.retriever.index(split=split, subset='doc')
 
         # retrieve
         out_retrieve = self.retriever.retrieve(split, return_embeddings=False)
@@ -83,7 +83,7 @@ class RAG:
         query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
 
         # rerank
-        if self.reranker.model != None:
+        if self.reranker !=  None:
             rerank_dataset = make_hf_dataset(
                 self.datasets[split], 
                 query_ids, 
@@ -94,6 +94,7 @@ class RAG:
             
             out_ranking = self.reranker.eval(rerank_dataset)
             query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
+        
         gen_dataset = make_hf_dataset(
             self.datasets[split], 
             query_ids, 
@@ -101,8 +102,8 @@ class RAG:
             multi_doc=True, 
             pyserini_docs=docs
             )
-        query_ids, instructions, responses, labels  = self.generator.eval(gen_dataset)
-        metrics_out = self.metrics[split].compute(predictions=responses, references=labels)
+        query_ids, queries, instructions, responses, labels  = self.generator.eval(gen_dataset)
+        metrics_out = self.metrics[split].compute(predictions=responses, references=labels, questions=queries)
 
         return {
                 "instruction": instructions,

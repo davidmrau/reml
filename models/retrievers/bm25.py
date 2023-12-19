@@ -53,8 +53,8 @@ class BM25:
             self.save_documents_to_json(dataset, json_folder) 
             os.makedirs(dataset_path)
             self.run_index_process(dataset_path, json_folder, num_threads)
-            print('Removing tmp files.')
-            shutil.rmtree(json_folder)
+            #print('Removing tmp files.')
+            #shutil.rmtree(json_folder)
         return 
 
     def run_index_process(self, out_folder, json_folder, num_threads):
@@ -73,7 +73,7 @@ class BM25:
             print(f"Error: {e}")
 
 
-    def save_documents_to_json(self, dataset, output_folder, max_per_file=200000):
+    def save_documents_to_json(self, dataset, output_folder, max_per_file=250000):
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
             # Save each chunk to a separate JSON file

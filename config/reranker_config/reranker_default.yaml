@@ -1,0 +1,3 @@
+model_name: null
+batch_size: 1
+top_k_documents: 1
