@@ -1,11 +1,13 @@
 # Retrieve
 from tqdm import tqdm
+import sys
 from torch.utils.data import DataLoader
 import torch
 from collections import defaultdict
 import os 
 from shutil import rmtree
-
+from datasets import Dataset
+import glob
 class Retrieve:
     def __init__(self, 
                  model_name=None, 
@@ -24,15 +26,18 @@ class Retrieve:
         self.index_folder = index_folder
         self.pyserini_num_threads = pyserini_num_threads
         # match model class
-        if self.model_name == 'splade':
+        if self.model_name == 'naver/splade-cocondenser-selfdistil':
             from models.retrievers.splade import Splade
             retriever_class = Splade
         elif self.model_name == 'bm25':
             from models.retrievers.bm25 import BM25
             retriever_class = BM25
-        elif self.model_name == 'retromae':
+        elif self.model_name == 'Shitao/RetroMAE':
             from models.retrievers.retromae import RetroMAE
             retriever_class = RetroMAE
+        elif self.model_name == 'castorini/repllama-v1-7b-lora-passage':
+            from models.retrievers.repllama import RepLlama
+            retriever_class = RepLlama
         else:
             #raise ValueError(f"Model {kwargs['model_name']} not implemented!")
             from models.retrievers.dpr import DPR
@@ -40,44 +45,40 @@ class Retrieve:
 
         # instaniate model
         self.model = retriever_class(model_name=self.model_name)
-        # preprocess dataset on init
-        self.datasets = datasets
-        self.datasets = self.preprocess_datasets(datasets)
 
-    def index(self, split, subset):
-        print(self.datasets)
-        dataset = self.datasets[split][subset]
-        index_path = self.get_index_path(split, subset)
+        self.datasets = datasets
+
+    def index(self, split, query_or_doc):
+        dataset = self.datasets[split][query_or_doc]
+        dataset = dataset.remove_columns(['id'])
+        index_path = self.get_index_path(split, query_or_doc)
         # if dataset has not been encoded before
         if not os.path.exists(index_path):
             if self.model_name == 'bm25':
                 self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
             else: 
-                os.makedirs(self.index_folder, exist_ok=True)
-                embs = self.encode(dataset)
-                self.save_index(embs, index_path)
+                embs = self.encode(dataset, query_or_doc=query_or_doc, detach=True, index_path=index_path)
+                # self.save_index(embs, index_path)
     
-    @torch.no_grad 
-    def save_index(embs, index_path):
-        embs = embs.detach().cpu()
+    def save_index(self, embedding, index_path):
+        os.makedirs(index_path, exist_ok=True)
         chunk_size = 250000  # Set the size of each chunk
         num_chunks = embedding.size(0) // chunk_size + 1
 
         for i in range(num_chunks):
             start_idx = i * chunk_size
             end_idx = min((i + 1) * chunk_size, embedding.size(0))
-            chunk_embedding = embedding[start_idx:end_idx, :] 
+            chunk_embedding = embedding[start_idx:end_idx, :].clone() 
             # Save each chunk
-            chunk_save_path = self.get_chunk_path(index_path, chunk)
+            chunk_save_path = self.get_chunk_path(index_path, i)
             torch.save(chunk_embedding, chunk_save_path)
         
-    @torch.no_grad()
-    def retrieve(self, split, return_embeddings=False, sort_by_score=True, return_docs=False):
+    def retrieve(self, split, return_embeddings=False, return_docs=False):
         dataset = self.datasets[split]
         doc_ids = dataset['doc']['id']
         q_ids = dataset['query']['id']
+        index_path = self.get_index_path(split, 'doc')
         if self.model_name == "bm25":
-            index_path = self.get_index_path(split, 'doc')
             bm25_out = self.model(
                 dataset['query'], 
                 index_path=index_path, 
@@ -89,24 +90,20 @@ class Retrieve:
             
             return bm25_out
         else:
+            
             doc_embs = self.load_index(index_path)
-            q_embs = self.encode(dataset['query'])
-            scores = self.sim_dot(q_embs, doc_embs)
-            if sort_by_score:
-                idxs_sorted = self.sort_by_score_indexes(scores)
-                # get top-k indices
-                idxs_sorted_top_k = idxs_sorted[:, :self.top_k_documents]
+            q_embs = self.encode(dataset['query'], query_or_doc='query')
+            scores_sorted_topk, indices_sorted_topk = self.similarity_dot(q_embs, doc_embs)
+            if return_embeddings:
                 # use sorted top-k indices indices to retrieve corresponding document embeddings
-                doc_embs = doc_embs[idxs_sorted_top_k]
-                # use sorted top-k indices to gather scores
-                scores = scores.gather(dim=1, index=idxs_sorted_top_k)
-                # Use sorted top-k indices indices to retrieve corresponding document IDs
-                doc_ids = [[doc_ids[i] for i in q_idxs] for q_idxs in idxs_sorted_top_k]
+                doc_embs = doc_embs[indices_sorted_topk]
+            # Use sorted top-k indices indices to retrieve corresponding document IDs
+            doc_ids = [[doc_ids[i] for i in q_idxs] for q_idxs in indices_sorted_topk]
 
             return {
                 "doc_emb": doc_embs if return_embeddings else None,
                 "q_emb": q_embs if return_embeddings else None,
-                "score": scores,
+                "score": scores_sorted_topk,
                 "q_id": q_ids,
                 "doc_id": doc_ids
                 }
@@ -114,27 +111,47 @@ class Retrieve:
     def load_index(self, index_path):
         num_emb_files = len(glob.glob(f'{index_path}/*.pt'))
         embs = list()
-        for i in range(num_emb_files):
+        for i in tqdm(range(num_emb_files), total=num_emb_files, desc=f'Loading saved index {index_path}'):
             chunk_path = self.get_chunk_path(index_path, i)
             emb = torch.load(chunk_path)
             embs.append(emb)
-        embs = torch.concat(embs, dim=1)
+        embs = torch.cat(embs)
         return embs.to(self.model.device)
-            
-    def encode(self, dataset):
+
+    @torch.no_grad() 
+    def encode(self, dataset, query_or_doc=None, detach=False, index_path=None):
+        if index_path != None:
+            os.makedirs(index_path, exist_ok=True)
         dataloader = DataLoader(
             dataset, 
             batch_size=self.batch_size, 
-            collate_fn=self.model.collate_fn
+            collate_fn=lambda batch: self.model.collate_fn(batch, query_or_doc) if query_or_doc != None else self.model.collate_fn(batch),
+            num_workers=4
             )
+        
         embs_list = list()
-        for i, batch in tqdm(enumerate(dataloader, desc=f'Encoding: {self.model_name}')):
+        for i, batch in tqdm(enumerate(dataloader), total=len(dataset)//self.batch_size, desc=f'Encoding: {self.model_name}', file=sys.stdout):
+            
             outputs = self.model(batch)
             emb = outputs['embedding']
+            if detach:
+                emb = emb.detach().cpu()
             embs_list.append(emb)
+            if index_path != None and i % 1000 == 0 and i != 0:
+                chunk_save_path = self.get_chunk_path(index_path, i)
+                embs = torch.cat(embs_list)
+                torch.save(embs, chunk_save_path)
+                embs_list = list()
+        if index_path != None:
+            chunk_save_path = self.get_chunk_path(index_path, i)
             embs = torch.cat(embs_list)
-            return embs
-        
+            torch.save(embs, chunk_save_path)
+
+
+        if index_path != None:
+            return None
+        else:
+            return torch.cat(embs_list)
     
     def sort_by_score_indexes(self, scores):
         idxs_sorted = list()
@@ -144,43 +161,33 @@ class Retrieve:
         idxs_sorted = torch.stack(idxs_sorted)
         return idxs_sorted
 
-    @torch.no_grad
-    def sim_dot(self, emb_q, emb_doc):
-        scores = list()
+    def similarity_dot(self, emb_q, emb_doc, batch_size=250):
+        scores_sorted, indices_sorted = list(), list()
+        emb_q = emb_q.half()
         # !! perhaps OOM for very large corpora, might need to be batched for documents as well
-        for emb_q_single in emb_q:
+        for i in tqdm(range(0, emb_q.shape[0], self.batch_size_sim), desc=f'Retrieving docs...', total=emb_q.shape[0]//batch_size):
+            print(emb_q.shape)
+            emb_q_single = emb_q[i:i+self.batch_size_sim]
             scores_q = torch.matmul(emb_q_single, emb_doc.t())
-            scores.append(scores_q)
-        scores = torch.stack(scores)
-        return scores
+            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=0)
+            scores_sorted_q = scores_sorted_q.detach().cpu()
+            print(scores_sorted_q.shape)
+            scores_sorted.append(scores_sorted_q)
+            indices_sorted.append(indices_sorted_q)
+        sorted_scores = torch.stack(scores_sorted)
+        indices_sorted = torch.stack(indices_sorted)
+        return sorted_scores, indices_sorted
 
     def tokenize(self, example):
        return self.model.tokenize(example)
     
     
-    def get_index_path(self, split, subset):
-        return f'{self.index_folder}/{self.datasets[split][subset].name}_{subset}_{self.model_name.split("/")[-1]}'
+    def get_index_path(self, split, query_or_doc):
+        return f'{self.index_folder}/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.model_name.split("/")[-1]}'
     
+    def get_dataset_path(self, split, query_or_doc):
+        return f'datasets/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.model_name.split("/")[-1]}'
+
     def get_chunk_path(self, index_path, chunk):
         return f'{index_path}/embedding_chunk_{chunk + 1}.pt'
 
-    def preprocess_datasets(self, datasets):
-        # copy dataset to retriever class and tokenize when not using bm25
-        # only tokenize if not using bm25
-        if self.model_name != 'bm25':
-            for split in datasets:
-                for subset in datasets[split]:
-                    if datasets[split][subset] != None:
-                        index_folder = self.get_index_path(split, subset)
-                        if os.path.exists(index_folder):
-                            dataset = datasets.Dataset.load_from_disk(index_folder)
-                        else: 
-                            dataset = datasets[split][subset]
-                            # apply tokenizer 
-                            dataset = dataset.map(self.tokenize, batched=True, desc=f'Processing dataset {split} {subset} for {self.model_name}')
-                            # remove all non-model input fields
-                            dataset = dataset.remove_columns(['content'])
-                            dataset.save_to_disk(index_folder)
-                        datasets[split][subset] = dataset
-         
-        return datasets

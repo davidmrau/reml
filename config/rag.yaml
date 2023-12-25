@@ -1,9 +1,10 @@
 # main_config.yaml
 
 defaults:
+    - _self_
     - retriever_config: retromae
     - reranker_config: null
-    - generator_config: null
+    - generator_config: llama-2-7b-chat
     - dataset_config: nq_open
 
 run_name: ???

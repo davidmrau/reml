@@ -1,5 +1,5 @@
-model_name: "retromae"
-batch_size: 10240
+model_name: "Shitao/RetroMAE"
+batch_size: 4096
 batch_size_sim: 256
 top_k_documents: 3
-pyserini_num_threads: 20
+pyserini_num_threads: None

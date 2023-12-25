@@ -58,16 +58,15 @@ class RAG:
     def retrieve(self):
         split = 'test'
         # index
-        self.retriever.index(split=split, subset='doc')
+        self.retriever.index(split=split, query_or_doc='doc')
 
         # retrieve
         out_retrieve = self.retriever.retrieve(split, return_embeddings=False)
         print(out_retrieve)
 
-    def generate_simple(self):
-        split = 'test'
+    def generate_simple(self, split):
         # index
-        self.retriever.index(split, 'doc')
+        self.retriever.index(split, query_or_doc='doc')
         # retrieve
 
         fetch_pyserini_docs=False
@@ -78,7 +77,11 @@ class RAG:
             return_docs=fetch_pyserini_docs,
             )
         
-        query_ids, doc_ids, docs = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc']
+        query_ids, doc_ids = out_ranking['q_id'], out_ranking['doc_id']
+
+        docs = out_ranking['doc'] if fetch_pyserini_docs else None
+
+        # if only retrieval print retrieval output
         if self.reranker == self.generator == None:
             print(out_ranking)
             return out_ranking

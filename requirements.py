@@ -9,3 +9,4 @@ pyserini
 tensorflow_hub
 tensorflow
 omegaconf
+peft

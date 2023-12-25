@@ -13,8 +13,8 @@ class Llama2():
                  ):
         self.model_name = model_name
         self.format_instruction = format_instruction
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, padding_side='left')
+        self.tokenizer.pad_token = self.tokenizer.bos_token
         quant_config = BitsAndBytesConfig(
                             load_in_4bit=True,
                             bnb_4bit_quant_type='nf4',
@@ -24,7 +24,8 @@ class Llama2():
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         #self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config, use_flash_attention_2=True)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config, attn_implementation="flash_attention_2")
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config)
+        self.model.eval()
         self.model.config.pretraining_tp = 1
         self.max_new_tokens = max_new_tokens
         

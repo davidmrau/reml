@@ -8,6 +8,7 @@ class DPR:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.model.to(self.device)
+        self.model.eval()
         self.collate_fn = DefaultDataCollator()
 
     # Mean pooling

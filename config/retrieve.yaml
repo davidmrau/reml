@@ -1,7 +1,8 @@
 # main_config.yaml
 
 defaults:
-    - retriever_config: bm25
+    - _self_
+    - retriever_config: retromae
     - reranker_config: null
     - generator_config: null
     - dataset_config: nq_open
@@ -10,7 +11,7 @@ run_name: ???
 dataset_folder: 'datasets/'
 index_folder: 'indexes/'
 experiment_folder: 'experiments/'
-processing_num_proc: 30
+processing_num_proc: 40
 overwrite_datasets: false
 debug: false
 

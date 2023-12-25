@@ -36,12 +36,12 @@ class ODQAWikiCorpora100WTamberProcessor:
     @staticmethod
     def process(split, num_proc=None):
         hf_name = 'castorini/odqa-wiki-corpora'
-        hf_subset_name= "wiki-text-100w-tamber"
+        hf_query_or_doc_name= "wiki-text-100w-tamber"
 
-        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
+        dataset = datasets.load_dataset(hf_name, hf_query_or_doc_name, num_proc=num_proc)[split]
         def map_fn(example):
-            example['content'] = f"{example['title']}: {example['text']}"
-            return examplE
+            example['content'] = f"{example['title']} {example['text']}"
+            return example
         
         dataset = dataset.map(map_fn, num_proc=num_proc)
         dataset = dataset.rename_column("docid", "id")
@@ -54,9 +54,9 @@ class ODQAWikiCorpora100WKarpukhinProcessor:
     @staticmethod
     def process(split, num_proc=None):
         hf_name = 'castorini/odqa-wiki-corpora'
-        hf_subset_name= "wiki-text-100w-karpukhin"
+        hf_query_or_doc_name= "wiki-text-100w-karpukhin"
 
-        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
+        dataset = datasets.load_dataset(hf_name, hf_query_or_doc_name, num_proc=num_proc)[split]
         def map_fn(example):
             example['content'] = f"{example['title']}: {example['text']}"
             return example
@@ -71,9 +71,9 @@ class ODQAWikiCorpora63tamberProcessor:
     @staticmethod
     def process(split, num_proc=None):
         hf_name = 'castorini/odqa-wiki-corpora'
-        hf_subset_name= "wiki-text-6-3-tamber"
+        hf_query_or_doc_name= "wiki-text-6-3-tamber"
 
-        dataset = datasets.load_dataset(hf_name, hf_subset_name, num_proc=num_proc)[split]
+        dataset = datasets.load_dataset(hf_name, hf_query_or_doc_name, num_proc=num_proc)[split]
         def map_fn(example):
             example['content'] = f"{example['title']}: {example['text']}"
             return example
@@ -177,18 +177,18 @@ class ProcessDatasets:
         doc_processor = CollectionProcessor(out_folder=out_folder, num_proc=num_proc, overwrite=overwrite)
         query_processor = QueryProcessor(out_folder=out_folder, num_proc=num_proc, overwrite=overwrite)
         for split in datasets:
-            for subset in datasets[split]:
-                if datasets[split][subset] != None:
-                    dataset_name, dataset_split_name = datasets[split][subset]
-                    if subset == 'query':
+            for query_or_doc in datasets[split]:
+                if datasets[split][query_or_doc] != None:
+                    dataset_name, dataset_split_name = datasets[split][query_or_doc]
+                    if query_or_doc == 'query':
                         processor_class = query_processor
                         dataset = processor_class.get_dataset(dataset_name, dataset_split_name, debug=debug)
-                    elif subset == 'doc':
+                    elif query_or_doc == 'doc':
                         processor_class = doc_processor
                         dataset = processor_class.get_dataset(dataset_name, dataset_split_name, debug=False)
-                    processed_datasets[split][subset] = dataset
+                    processed_datasets[split][query_or_doc] = dataset
                 else:
-                    processed_datasets[split][subset] = None
+                    processed_datasets[split][query_or_doc] = None
         return processed_datasets
 
     

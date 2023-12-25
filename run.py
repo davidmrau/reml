@@ -27,7 +27,7 @@ def main(config):
 
 
     rag = RAG(**config)
-    out_generate = rag.generate_simple()
+    out_generate = rag.generate_simple(split='test')
 if __name__ == "__main__":
     # needed for multiprocessing to avoid CUDA forked processes erro
     # https://huggingface.co/docs/datasets/main/en/process#multiprocessing

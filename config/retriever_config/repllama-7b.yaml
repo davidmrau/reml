@@ -1,0 +1,5 @@
+model_name: "castorini/repllama-v1-7b-lora-passage"
+batch_size: 128
+batch_size_sim: 256
+top_k_documents: 3
+pyserini_num_threads: None

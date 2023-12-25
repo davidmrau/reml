@@ -17,8 +17,8 @@ class Generate():
         self.format_instruction = format_instruction
         self.max_inp_length = max_inp_length
 
-        if self.batch_size > 1:
-            raise NotImplementedError('Only batch size 1 is implemented yet.')
+        #if self.batch_size > 1:
+        #    raise NotImplementedError('Only batch size 1 is implemented yet.')
         if self.model_name == 'dummy':
             from models.generators.dummy import Dummy
             generator_class = Dummy
@@ -33,6 +33,7 @@ class Generate():
 
     def collate_fn(self, examples):
         ids = [e['q_id'] for e in examples]
+        print(examples)
         instr = [self.format_instruction(e) for e in examples]
         label = [e['label'] for e in examples]
         query = [e['query'] for e in examples]
