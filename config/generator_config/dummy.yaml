@@ -1,4 +1,4 @@
-model_name: "meta-llama/Llama-2-7b-chat-hf"
+model_name: "dummy"
 batch_size: 16
 max_new_tokens: 4
 max_inp_length: null

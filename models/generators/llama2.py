@@ -9,10 +9,8 @@ class Llama2():
     def __init__(self, 
                  model_name=None, 
                  max_new_tokens=1, 
-                 format_instruction=None
                  ):
         self.model_name = model_name
-        self.format_instruction = format_instruction
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, padding_side='left')
         self.tokenizer.pad_token = self.tokenizer.bos_token
         quant_config = BitsAndBytesConfig(
@@ -32,5 +30,17 @@ class Llama2():
     def generate(self, instr_tokenized):
         generated_ids =  self.model.generate(**instr_tokenized.to(self.device), max_new_tokens=self.max_new_tokens)
         generated_response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        return generated_response
+        cleaned_generated_response = [gen.split(self.get_response_marker(), 1)[1] for gen in generated_response]
+        return cleaned_generated_response
 
+    def get_response_marker(self):
+        return " Response: "
+
+    def format_instruction(self, sample):
+        if 'doc' in sample:
+            docs_prompt = ''
+            for i, doc in enumerate(sample['doc']):
+                docs_prompt += f"Document {i+1}: {doc}\n"
+            return f"""Please answer the question given the support documents:\n Question: {sample['query']}\n Support Documents:\n{docs_prompt}\n{self.get_response_marker()} """
+        else:
+            return f"""Please answer the question.\n Question: {sample['query']}\n{self.get_response_marker()}"""

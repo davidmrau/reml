@@ -37,7 +37,7 @@ class BEM:
         return {'input_ids': torch.stack(input_ids), 'segment_ids': torch.stack(segment_ids)}
 
     def __call__(self, predictions, references, questions):
-        assert len(predictions) == len(reference) == len(questions)
+        assert len(predictions) == len(references) == len(questions)
         examples = [{'question': questions[i], 'reference': references[i], 'candidate': candidates[i]}  for i in range(len(predictions))]
         
         inputs = bertify_examples(examples, max_length=tokenizer.model_max_length)

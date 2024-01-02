@@ -14,20 +14,16 @@ def main(config):
     from rag import RAG
     import json
 
-    # make experiment_dir
+    # make dirs
+    os.makedirs(config.experiment_folder, exist_ok=True)
+    os.makedirs(config.index_folder, exist_ok=True)
+    os.makedirs(config.run_folder, exist_ok=True)
     run_folder = f"{config.experiment_folder}/{config.run_name}"
     os.makedirs(run_folder, exist_ok=True)
     OmegaConf.save(config=config, f=f"{run_folder}/config.yaml")
 
-    def format_instruction(sample):
-        docs_prompt = ''
-        for i, doc in enumerate(sample['doc']):
-            docs_prompt += f"Document {i+1}: {doc}\n"
-        return f"""Please write answer the query given the support documents:\n Query: {sample['query']}\n Support Documents:\n{docs_prompt}\n Response: """
-
-
     rag = RAG(**config)
-    out_generate = rag.generate_simple(split='test')
+    rag.default(split='test')
 if __name__ == "__main__":
     # needed for multiprocessing to avoid CUDA forked processes erro
     # https://huggingface.co/docs/datasets/main/en/process#multiprocessing

@@ -5,8 +5,11 @@ import evaluate
 import string
 import regex 
 import numpy as np
+from rouge import Rouge
+from tqdm import tqdm
 
 
+from collections import Counter
 def simple_accuracy(preds, labels):
     return float((preds == labels).mean())
 
@@ -58,32 +61,64 @@ def f1(prediction, ground_truth):
     f1 = (2 * precision * recall) / (precision + recall)
     return f1
 
+def rouge_wrapper(prediction, ground_truth):
+    try:
+        result = rouge.get_scores(prediction, ground_truth, avg=True)
+        return result["rouge-1"]["f"], result["rouge-2"]["f"], result["rouge-l"]["f"]
+    except:
+        return 0.0, 0.0, 0.0
+
+
+def rouge_score_single(prediction, ground_truths):
+    ground_truths = [x for x in ground_truths if len(x) > 0]
+    if (
+        len(prediction) == 0 or len(ground_truths) == 0
+    ):  # check if empty prediction or if there is no hypothesis with len > 0
+        return 0.0, 0.0, 0.0
+    scores = [rouge_wrapper(prediction, gt) for gt in ground_truths]
+    rouge1 = max(s[0] for s in scores)
+    rouge2 = max(s[1] for s in scores)
+    rougel = max(s[2] for s in scores)
+    return rouge1, rouge2, rougel
+
+def rouge_score(predictions, references):
+    rouge1, rouge2, rougel = list(), list(), list()
+    for ground_truths, predicition in tqdm(zip(references, predictions), desc='Calculating Rouge...'):
+        rouge1_, rouge2_, rougel_ = rouge_score_single(predictions, ground_truths) 
+        rouge1.append(rouge1_)
+        rouge2.append(rouge2_)
+        rougel.append(rougel_)
+    return np.mean(rouge1), np.mean(rouge2), np.mean(rougel)
+
+
 def f1_score(predictions, references):
-    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, predicition in zip(references, predicions)])
+    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in tqdm(zip(references, predictions), desc='Calculating F1...')])
 
 def em(prediction, ground_truth):
-    print(prediction, ground_truth)
     return float(normalize(prediction) == normalize(ground_truth))
 
 
 def exact_match_score(predictions, references):
-    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
-
+    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in tqdm(zip(references, predictions), desc='Calculating EM...')])
 
 
 class Metrics:
-    def __init__(self, dataset_name, bem=False):
+    def __init__(self, dataset_name, bem=True):
         self.dataset_name = dataset_name
-        if bem:
-            from evaluation.bem import BEM
-            self.bem = BEM()
+        #if bem:
+        #    from evaluation.bem import BEM
+        #    self.bem = BEM()
 
     def compute(self, predictions, references, questions=None):
         if self.dataset_name == "nq_open":
+            rouge1, rouge2, rougel = rouge_score(predictions, references)
             return {
                         "EM": exact_match_score(predictions, references),
-                        "BEM": self.bem(references, predictions, questions),
+                        #"BEM": self.bem(references, predictions, questions),
                         "f1": f1_score(predictions, references),
+                        "Rouge-1": rouge1,
+                        "Rouge-2": rouge2,
+                        "Rouge-L": rougel,
                     }
         else:
             raise KeyError()

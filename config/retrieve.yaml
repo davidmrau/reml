@@ -11,6 +11,7 @@ run_name: ???
 dataset_folder: 'datasets/'
 index_folder: 'indexes/'
 experiment_folder: 'experiments/'
+run_folder: 'runs/'
 processing_num_proc: 40
 overwrite_datasets: false
 debug: false

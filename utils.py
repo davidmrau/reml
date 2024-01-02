@@ -1,5 +1,7 @@
 import datasets
 import random 
+import json
+from collections import defaultdict
 
 def get_by_ids(dataset, ids):
     # if single id is passed cast it to list
@@ -13,45 +15,48 @@ def get_by_ids(dataset, ids):
 # then constructs hf_dataset out of it
 # pyserini_docs=True documents have been returned by bm25 and don't contents don't need to be fetched
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
-    dataset_dict = {'query': [], 'doc': [], 'q_id': []}
-    labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
-    if labels != None:
-        dataset_dict['label'] = []
-    if not multi_doc:
-        dataset_dict['d_id'] = []
-    assert len(d_ids) == len(q_ids)
 
-    queries = get_by_ids(dataset['query'], q_ids)
-    for i, q_id in enumerate(q_ids):
+    if q_ids == d_ids == None:
+        dataset_dict = {'query': dataset['content'], 'q_id': dataset['id']}
         
-        if pyserini_docs == None:
-            docs = get_by_ids(dataset['doc'], d_ids[i])
-        else:
-            docs = pyserini_docs[i]
-        # for multi_doc=True, all documents are saved to the 'doc' entry
-        if multi_doc:
-            dataset_dict['doc'].append(docs)
-            dataset_dict['query'].append(queries[i])
-            dataset_dict['q_id'].append(q_id)
-            if labels != None:
-                dataset_dict['label'].append(labels[i])
-        else:
-            # for multi_doc=False, we save every document to a new entry
-                for d_id, doc in zip(d_ids[i], docs):
-                    dataset_dict['d_id'].append(d_id)
-                    dataset_dict['doc'].append(doc)
-                    dataset_dict['query'].append(queries[i])
-                    dataset_dict['q_id'].append(q_id)
-                    if labels != None:
-                        dataset_dict['label'].append(labels[i])
+    else:
+        dataset_dict = {'query': [], 'doc': [], 'q_id': []}
+        labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
+        if labels != None:
+            dataset_dict['label'] = []
+        if not multi_doc:
+            dataset_dict['d_id'] = []
+        assert len(d_ids) == len(q_ids)
+
+        queries = get_by_ids(dataset['query'], q_ids)
+        for i, q_id in enumerate(q_ids):
+            if pyserini_docs == None:
+                docs = get_by_ids(dataset['doc'], d_ids[i])
+            else:
+                docs = pyserini_docs[i]
+            # for multi_doc=True, all documents are saved to the 'doc' entry
+            if multi_doc:
+                dataset_dict['doc'].append(docs)
+                dataset_dict['query'].append(queries[i])
+                dataset_dict['q_id'].append(q_id)
+                if labels != None:
+                    dataset_dict['label'].append(labels[i])
+            else:
+                # for multi_doc=False, we save every document to a new entry
+                    for d_id, doc in zip(d_ids[i], docs):
+                        dataset_dict['d_id'].append(d_id)
+                        dataset_dict['doc'].append(doc)
+                        dataset_dict['query'].append(queries[i])
+                        dataset_dict['q_id'].append(q_id)
+                        if labels != None:
+                            dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(gen_out, n=3):
-    ids, instructions, responses, labels = gen_out['q_id'], gen_out['instruction'], gen_out['response'], gen_out['labels']
-    rand = random.sample(range(len(ids)), n)
+def print_generate_out(responses, query_ids, labels, n=3):
+    rand = random.sample(range(len(query_ids)), n)
     for i in rand:
         print('_'*50)
-        print('Query ID:', ids[i])
+        print('Query ID:', query_ids[i])
         print('_'*50)
         #print('Instruction to Generator:')
         #print(instructions[i])
@@ -79,7 +84,46 @@ def print_rag_model(rag, retriever_kwargs,reranker_kwargs, generator_kwargs):
     print()
 
 
+def write_trec(fname, q_ids, d_ids, scores):
+    with open(fname, 'w') as fout:
+        for i, q_id in enumerate(q_ids):
+            for rank, (d_id, score) in enumerate(zip(d_ids[i], scores[i])):
+                fout.write(f'{q_id}\tq0\t{d_id}\t{rank+1}\t{score.item()}\trun\n')
 
+def write_generated(out_folder, query_ids, instructions, responses, labels, metrics_out, generation_time_seconds):
+    json_dict = {}
+    json_dict['gen_time_hours'] = generation_time_seconds/3600
+    json_dict['metrics'] = metrics_out
+    json_dict['generated'] = list()
+    
+    for i, q_id in enumerate(query_ids):
+        for response, instruction, label in zip(responses, instructions, labels):
+            jsonl = {}
+            jsonl['q_id'] = q_id
+            jsonl['response'] = response
+            jsonl['instruction'] = instruction
+            jsonl['label'] = label
+            json_dict['generated'].append(jsonl)
+
+    with open(f'{out_folder}/generated_out.json', 'w') as fp:
+        json.dump(json_dict, fp)
+
+def load_trec(fname):
+    # read file
+    trec_dict = defaultdict(list)
+    for l in open(fname):
+        q_id, _, d_id, _, score, _ = l.split('\t')
+        trec_dict[q_id].append((d_id, score))
+    q_ids, d_ids, scores = list(), list(), list()
+    for q_id in trec_dict:
+        q_ids.append(q_id)
+        d_ids_q, scores_q = list(), list()
+        for d_id, score in trec_dict[q_id]:
+            d_ids_q.append(d_id)
+            scores_q.append(float(score))
+        d_ids.append(d_ids_q)
+        scores.append(scores_q)
+    return q_ids, d_ids, scores
 
 class LookupDatasetHF(datasets.Dataset):
 

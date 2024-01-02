@@ -53,12 +53,11 @@ class Retrieve:
         dataset = dataset.remove_columns(['id'])
         index_path = self.get_index_path(split, query_or_doc)
         # if dataset has not been encoded before
-        # if not os.path.exists(index_path):
-        if True:
+        if not os.path.exists(index_path):
             if self.model_name == 'bm25':
                 self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
             else: 
-                embs = self.encode(dataset, query_or_doc=query_or_doc, detach=True, index_path=index_path)
+                self.encode(dataset, query_or_doc=query_or_doc, detach=True, index_path=index_path)
                 # self.save_index(embs, index_path)
     
     def save_index(self, embedding, index_path):
@@ -135,7 +134,6 @@ class Retrieve:
         for i, batch in tqdm(enumerate(dataloader), total=len(dataset)//self.batch_size, desc=f'Encoding: {self.model_name}', file=sys.stdout):
             #if i <= continue_example:
             #    continue
-                
             outputs = self.model(batch)
             emb = outputs['embedding']
             if detach:
@@ -155,46 +153,38 @@ class Retrieve:
                 embs = embs.to_sparse()
             torch.save(embs, chunk_save_path)
 
-
         if index_path != None:
             return None
         else:
             return torch.cat(embs_list)
     
-    def sort_by_score_indexes(self, scores):
-        idxs_sorted = list()
-        for q_scores in scores:
-            idx_sorted = torch.argsort(q_scores, descending=True)
-            idxs_sorted.append(idx_sorted)
-        idxs_sorted = torch.stack(idxs_sorted)
-        return idxs_sorted
-
     def similarity_dot(self, emb_q, emb_doc, batch_size=250):
         scores_sorted, indices_sorted = list(), list()
         emb_q = emb_q.half()
         # !! perhaps OOM for very large corpora, might need to be batched for documents as well
         for i in tqdm(range(0, emb_q.shape[0], self.batch_size_sim), desc=f'Retrieving docs...', total=emb_q.shape[0]//batch_size):
-            print(emb_q.shape)
-            emb_q_single = emb_q[i:i+self.batch_size_sim]
-            scores_q = torch.matmul(emb_q_single, emb_doc.t())
-            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=0)
+            emb_q_batch= emb_q[i:i+self.batch_size_sim]
+            scores_q = torch.matmul(emb_q_batch, emb_doc.t())
+            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=1)
             scores_sorted_q = scores_sorted_q.detach().cpu()
             scores_sorted.append(scores_sorted_q)
             indices_sorted.append(indices_sorted_q)
-        sorted_scores = torch.stack(scores_sorted)
-        indices_sorted = torch.stack(indices_sorted)
+        sorted_scores = torch.cat(scores_sorted, dim=0)
+        indices_sorted = torch.cat(indices_sorted, dim=0)
         return sorted_scores, indices_sorted
 
     def tokenize(self, example):
        return self.model.tokenize(example)
     
-    
+    def get_model_name(self):
+        return self.model_name.replace('/', '_')
+
     def get_index_path(self, split, query_or_doc):
-        return f'{self.index_folder}/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.model_name.split("/")[-1]}'
+        return f'{self.index_folder}{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.get_model_name()}'
     
     def get_dataset_path(self, split, query_or_doc):
-        return f'datasets/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.model_name.split("/")[-1]}'
+        return f'datasets/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.get_model_name()}'
 
     def get_chunk_path(self, index_path, chunk):
-        return f'{index_path}/embedding_chunk_{chunk}.pt'
+        return f'{index_path}/embedding_chunk_{chunk+1}.pt'
 

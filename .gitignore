@@ -6,3 +6,4 @@ datasets/
 indexes/
 outputs/
 slurm/logs/
+runs/
