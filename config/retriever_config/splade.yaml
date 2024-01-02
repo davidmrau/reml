@@ -1,0 +1,5 @@
+model_name: "naver/splade-cocondenser-selfdistil"
+batch_size: 256
+batch_size_sim: 256
+top_k_documents: 3
+pyserini_num_threads: None

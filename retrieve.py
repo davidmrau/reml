@@ -53,7 +53,8 @@ class Retrieve:
         dataset = dataset.remove_columns(['id'])
         index_path = self.get_index_path(split, query_or_doc)
         # if dataset has not been encoded before
-        if not os.path.exists(index_path):
+        # if not os.path.exists(index_path):
+        if True:
             if self.model_name == 'bm25':
                 self.model.index(dataset, index_path, num_threads=self.pyserini_num_threads)
             else: 
@@ -90,7 +91,6 @@ class Retrieve:
             
             return bm25_out
         else:
-            
             doc_embs = self.load_index(index_path)
             q_embs = self.encode(dataset['query'], query_or_doc='query')
             scores_sorted_topk, indices_sorted_topk = self.similarity_dot(q_embs, doc_embs)
@@ -119,32 +119,40 @@ class Retrieve:
         return embs.to(self.model.device)
 
     @torch.no_grad() 
-    def encode(self, dataset, query_or_doc=None, detach=False, index_path=None):
+    def encode(self, dataset, query_or_doc=None, detach=False, index_path=None, chunk_size=5000):
+        continue_example = 0
         if index_path != None:
             os.makedirs(index_path, exist_ok=True)
         dataloader = DataLoader(
             dataset, 
             batch_size=self.batch_size, 
-            collate_fn=lambda batch: self.model.collate_fn(batch, query_or_doc) if query_or_doc != None else self.model.collate_fn(batch),
+            # collate_fn=lambda batch: self.model.collate_fn(batch, query_or_doc) if query_or_doc != None else self.model.collate_fn(batch),
+            collate_fn=lambda batch: self.model.collate_fn(batch, query_or_doc),
             num_workers=4
             )
         
         embs_list = list()
         for i, batch in tqdm(enumerate(dataloader), total=len(dataset)//self.batch_size, desc=f'Encoding: {self.model_name}', file=sys.stdout):
-            
+            #if i <= continue_example:
+            #    continue
+                
             outputs = self.model(batch)
             emb = outputs['embedding']
             if detach:
                 emb = emb.detach().cpu()
             embs_list.append(emb)
-            if index_path != None and i % 1000 == 0 and i != 0:
+            if index_path != None and i % chunk_size == 0 and i != 0:
                 chunk_save_path = self.get_chunk_path(index_path, i)
                 embs = torch.cat(embs_list)
+                if 'splade' in self.model_name:
+                    embs = embs.to_sparse()
                 torch.save(embs, chunk_save_path)
                 embs_list = list()
         if index_path != None:
             chunk_save_path = self.get_chunk_path(index_path, i)
             embs = torch.cat(embs_list)
+            if 'splade' in self.model_name:
+                embs = embs.to_sparse()
             torch.save(embs, chunk_save_path)
 
 
@@ -171,7 +179,6 @@ class Retrieve:
             scores_q = torch.matmul(emb_q_single, emb_doc.t())
             scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=0)
             scores_sorted_q = scores_sorted_q.detach().cpu()
-            print(scores_sorted_q.shape)
             scores_sorted.append(scores_sorted_q)
             indices_sorted.append(indices_sorted_q)
         sorted_scores = torch.stack(scores_sorted)
@@ -189,5 +196,5 @@ class Retrieve:
         return f'datasets/{self.datasets[split][query_or_doc].name}_{query_or_doc}_{self.model_name.split("/")[-1]}'
 
     def get_chunk_path(self, index_path, chunk):
-        return f'{index_path}/embedding_chunk_{chunk + 1}.pt'
+        return f'{index_path}/embedding_chunk_{chunk}.pt'
 

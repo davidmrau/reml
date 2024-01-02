@@ -13,7 +13,7 @@ class RepLlama:
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.model = self.get_model(model_name)
-        self.model.max_length = 256
+        self.tokenizer.model_max_length = 512
 
 
     def get_model(self, peft_model_name):
@@ -41,14 +41,23 @@ class RepLlama:
 
     def __call__(self, kwargs):
         kwargs = {key: value.to(self.device) for key, value in kwargs.items()}
+        # get accumulated eos token counts per exmaple
+        accumulated_eos_tokens = (kwargs['input_ids'] != self.tokenizer.pad_token_id).cumsum(dim=1)
+        # check if accumulated eos token == to the length of example (means that no eos is contained in example because it has been truncated).
+        missing_eos_positions = accumulated_eos_tokens == kwargs['input_ids'].size(1)
+        kwargs['input_ids'][missing_eos_positions] = self.tokenizer.pad_token_id
         outputs = self.model(**kwargs)
         # pooling over hidden representations
         emb = outputs[0]
-        first_eos_indices = ((kwargs['input_ids'] == self.tokenizer.pad_token_id).cumsum(dim=1) == 1).nonzero()[:, 1]
+        
+        # count of eos tokens per example
+        num_eos = (kwargs['input_ids'] == self.tokenizer.pad_token_id).cumsum(dim=1)
+        # get index of first occurence of eos 
+        first_eos_indices = ( num_eos == 1).nonzero()[:, 1]
+
         # Gather the embeddings based on the first EOS indices
         first_eos_emb = emb[torch.arange(emb.size(0)), first_eos_indices]
-        #first_eos_emb = emb[:, -1]
-        normed_emb = torch.nn.functional.normalize(first_eos_emb, p=2, dim=0)
+        normed_emb = torch.nn.functional.normalize(first_eos_emb, p=2, dim=1)
 
         return {
                 "embedding": normed_emb

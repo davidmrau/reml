@@ -9,7 +9,6 @@ class DPR:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.model.to(self.device)
         self.model.eval()
-        self.collate_fn = DefaultDataCollator()
 
     # Mean pooling
     def mean_pooling(self, token_embeddings, mask):
@@ -26,6 +25,7 @@ class DPR:
                 "embedding": emb
             }
 
-    def tokenize(self, example):
-        inp =  self.tokenizer(example["content"], truncation=True, padding='max_length')
-        return inp
+    def collate_fn(self, batch, query_or_doc=None):
+        content = [sample['content'] for sample in batch]
+        return_dict = self.tokenizer(content, padding=True, truncation=True, return_tensors='pt')
+        return return_dict
