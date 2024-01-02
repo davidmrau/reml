@@ -61,8 +61,8 @@ class Generate():
             queries += info_dict['query']
             instructions += instruction
 
-            if hasattr(self.model, 'gold_answer'):
-                generated_response = self.model.gold_answer(label)
+            if self.model_name == 'dummy':
+                generated_response = self.model.generate(label)
             else:
                 generated_response = self.model.generate(inp_dict)
             

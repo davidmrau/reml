@@ -96,14 +96,13 @@ def write_generated(out_folder, query_ids, instructions, responses, labels, metr
     json_dict['metrics'] = metrics_out
     json_dict['generated'] = list()
     
-    for i, q_id in enumerate(query_ids):
-        for response, instruction, label in zip(responses, instructions, labels):
-            jsonl = {}
-            jsonl['q_id'] = q_id
-            jsonl['response'] = response
-            jsonl['instruction'] = instruction
-            jsonl['label'] = label
-            json_dict['generated'].append(jsonl)
+    for i, (q_id, response, instruction, label) in enumerate(zip(query_ids, responses, instructions, labels)):
+        jsonl = {}
+        jsonl['q_id'] = q_id
+        jsonl['response'] = response
+        jsonl['instruction'] = instruction
+        jsonl['label'] = label
+        json_dict['generated'].append(jsonl)
 
     with open(f'{out_folder}/generated_out.json', 'w') as fp:
         json.dump(json_dict, fp)
@@ -124,22 +123,3 @@ def load_trec(fname):
         d_ids.append(d_ids_q)
         scores.append(scores_q)
     return q_ids, d_ids, scores
-
-class LookupDatasetHF(datasets.Dataset):
-
-    # def __init__(self, args, kwargs):
-    #     super().__init__(*args, **kwargs)
-    def add_index(self):
-        # Add an index column to the dataset
-        self = self.add_column("index", range(len(self)))
-
-        # Create a mapping function from index to content_id
-        self.id2idx_map = dict(zip(self["id"], self["index"]))
-        print('added map')
-        print(self.id2idx_map)
-
-    def __getitem__(self, ids):
-        if type(ids) != list():
-            ids = list(ids)
-        idx = [self.id2idx_map[id_] for id_ in ids]
-        return self[idx]

@@ -7,9 +7,13 @@ import regex
 import numpy as np
 from rouge import Rouge
 from tqdm import tqdm
-
-
 from collections import Counter
+
+# partly copied from https://github.com/facebookresearch/atlas/blob/0ec8889492d5187b26c51b8d1781239a4cf6741e/src/evaluation.py
+
+rouge = Rouge()
+
+
 def simple_accuracy(preds, labels):
     return float((preds == labels).mean())
 
@@ -71,9 +75,8 @@ def rouge_wrapper(prediction, ground_truth):
 
 def rouge_score_single(prediction, ground_truths):
     ground_truths = [x for x in ground_truths if len(x) > 0]
-    if (
-        len(prediction) == 0 or len(ground_truths) == 0
-    ):  # check if empty prediction or if there is no hypothesis with len > 0
+    if len(prediction) == 0 or len(ground_truths) == 0:  
+        # check if empty prediction or if there is no hypothesis with len > 0
         return 0.0, 0.0, 0.0
     scores = [rouge_wrapper(prediction, gt) for gt in ground_truths]
     rouge1 = max(s[0] for s in scores)
@@ -83,8 +86,8 @@ def rouge_score_single(prediction, ground_truths):
 
 def rouge_score(predictions, references):
     rouge1, rouge2, rougel = list(), list(), list()
-    for ground_truths, predicition in tqdm(zip(references, predictions), desc='Calculating Rouge...'):
-        rouge1_, rouge2_, rougel_ = rouge_score_single(predictions, ground_truths) 
+    for ground_truths, predicition in zip(references, predictions):
+        rouge1_, rouge2_, rougel_ = rouge_score_single(predicition, ground_truths) 
         rouge1.append(rouge1_)
         rouge2.append(rouge2_)
         rougel.append(rougel_)
@@ -92,14 +95,14 @@ def rouge_score(predictions, references):
 
 
 def f1_score(predictions, references):
-    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in tqdm(zip(references, predictions), desc='Calculating F1...')])
+    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
 
 def em(prediction, ground_truth):
     return float(normalize(prediction) == normalize(ground_truth))
 
 
 def exact_match_score(predictions, references):
-    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in tqdm(zip(references, predictions), desc='Calculating EM...')])
+    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
 
 
 class Metrics:

@@ -138,5 +138,4 @@ class RAG:
             print_generate_out(
                 responses,
                 query_ids, 
-                labels, 
-                metrics_out)
+                labels)

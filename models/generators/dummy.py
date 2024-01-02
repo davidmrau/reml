@@ -13,10 +13,6 @@ class Dummy():
         self.model_name = model_name
         self.max_new_tokens = max_new_tokens
 
-
-    def gold_answer(self, labels):
-        return [label[0] for label in labels]
-
     def tokenizer(
             self, 
             instr, 
@@ -42,5 +38,5 @@ class Dummy():
             return f"""Please answer the question.\n Question: {sample['query']}\n{self.get_response_marker()}"""
     
     def generate(self, inp):
-        cleaned_generated_response = [gen.split(self.get_response_marker(), 1)[1] for gen in inp]
-        return cleaned_generated_response
+        return [gen[0] for gen in inp]
+        
