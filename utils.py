@@ -2,13 +2,15 @@ import datasets
 import random 
 import json
 from collections import defaultdict
+import torch
 
-def get_by_ids(dataset, ids):
+
+def get_by_ids(dataset, ids, field):
     # if single id is passed cast it to list
     if not isinstance(ids, list):
         ids = [ids]
     idxs = [ dataset.id2index[id_] for id_ in ids]
-    return dataset[idxs]['content']
+    return dataset[idxs][field]
 
 
 # gets q_ids and d_ids and does a lookup by id to get the content
@@ -24,17 +26,17 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
             }
     else:
         dataset_dict = {'query': [], 'doc': [], 'q_id': []}
-        labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
+        labels = get_by_ids(dataset['query'], q_ids, 'label') if 'label' in dataset['query'].features else None
         if labels != None:
             dataset_dict['label'] = []
         if not multi_doc:
             dataset_dict['d_id'] = []
         assert len(d_ids) == len(q_ids)
 
-        queries = get_by_ids(dataset['query'], q_ids)
+        queries = get_by_ids(dataset['query'], q_ids, 'content')
         for i, q_id in enumerate(q_ids):
             if pyserini_docs == None:
-                docs = get_by_ids(dataset['doc'], d_ids[i])
+                docs = get_by_ids(dataset['doc'], d_ids[i], 'content')
             else:
                 docs = pyserini_docs[i]
             # for multi_doc=True, all documents are saved to the 'doc' entry
@@ -55,8 +57,9 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
                             dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(queries, instructions, responses, query_ids, labels, n=3):
-    rand = random.sample(range(len(query_ids)), n)
+def print_generate_out(queries, instructions, responses, query_ids, labels, n=10):
+    #rand = random.sample(range(len(query_ids)), n)
+    rand = range(10)
     for i in rand:
         print('_'*50)
         print('Query ID:', query_ids[i])
@@ -65,9 +68,8 @@ def print_generate_out(queries, instructions, responses, query_ids, labels, n=3)
         print('Instruction to Generator:')
         print(instructions[i])
         print()
-        print('Generated Response:')
         print(responses[i])
-        print('Label:')
+        print('Label(s):')
         print(labels[i])
         print()
         print()
@@ -92,7 +94,7 @@ def write_trec(fname, q_ids, d_ids, scores):
     with open(fname, 'w') as fout:
         for i, q_id in enumerate(q_ids):
             for rank, (d_id, score) in enumerate(zip(d_ids[i], scores[i])):
-                fout.write(f'{q_id}\tq0\t{d_id}\t{rank+1}\t{score.item()}\trun\n')
+                fout.write(f'{q_id}\tq0\t{d_id}\t{rank+1}\t{score}\trun\n')
 
 def write_generated(out_folder, query_ids, instructions, responses, labels, metrics_out, generation_time_seconds):
     json_dict = {}

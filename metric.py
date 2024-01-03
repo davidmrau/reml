@@ -97,9 +97,7 @@ def rouge_score(predictions, references):
 def f1_score(predictions, references):
     f1, precision, recall = list(), list(), list()
     for ground_truths, prediction in zip(references, predictions):
-        print(ground_truths, prediction)
         f1_, precision_, recall_ = [max(values) for values in zip(*[f1_single(prediction, gt) for gt in ground_truths])]
-        print(f1_, precision_, recall_)
         f1.append(f1_)
         precision.append(precision_)
         recall.append(recall_)
@@ -114,11 +112,10 @@ def exact_match_score(predictions, references):
 
 
 class Metrics:
-    def __init__(self, dataset_name, bem=True):
+    def __init__(self, dataset_name):
         self.dataset_name = dataset_name
-        # if bem:
-        #    from evaluation.bem import BEM
-        #    self.bem = BEM()
+        from evaluation.bem import BEM
+        self.bem = BEM(batch_size=2048)
 
     def compute(self, predictions, references, questions=None):
         if "nq_open" in self.dataset_name:
@@ -126,7 +123,7 @@ class Metrics:
             f1, precision, recall = f1_score(predictions, references)
             return {
                         "EM": exact_match_score(predictions, references),
-                        #"BEM": self.bem(references, predictions, questions),
+                        "BEM": self.bem(predictions, references, questions),
                         "F1": f1,
                         "Precision": precision, 
                         "Recall": recall,

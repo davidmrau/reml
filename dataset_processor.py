@@ -24,6 +24,13 @@ class NQOpenProcessor:
 
         dataset = dataset.rename_column("answer", "label")
         dataset = dataset.rename_column("question", "content")
+        # replace \xa0 chars with space
+        # Define a function to clean the labels
+        def clean_labels(labels):
+            return [label.replace('\xa0', ' ') for label in labels]
+
+        # Apply the cleaning function to the 'label' column
+        dataset = dataset.map(lambda example: {'label': clean_labels(example['label'])})
 
         return dataset
     
@@ -103,21 +110,24 @@ class Processor(object):
         print(f'Processing dataset: {dataset_name}')
         debug_str = '_debug' if debug else ''
         out_folder = f'{self.out_folder}/{dataset_name}_{split}{debug_str}'
-        dataset_name += debug_str
         if os.path.exists(out_folder) and not self.overwrite:
             dataset = datasets.load_from_disk(out_folder)
+            if debug:
+                dataset = dataset.select(range(15))
+
             #id2index = self.tsv_to_dict(f'{out_folder}/id2index.csv')
             id2index = pickle.load(open(f'{out_folder}/id2index.p', 'rb'))
             dataset.id2index = id2index
         else:
             dataset = self.processors[dataset_name].process(split, num_proc=self.num_proc)
+            dataset.save_to_disk(out_folder)
             if debug:
                 dataset = dataset.select(range(15))
-            dataset.save_to_disk(out_folder)
             id2index = self.get_index_to_id(dataset) 
             dataset.id2index = id2index
             pickle.dump(id2index, open(f'{out_folder}/id2index.p', 'wb'))
             #self.dict_to_tsv(id2index, f'{out_folder}/id2index.csv')
+            dataset_name += debug_str
         dataset.name = dataset_name
         
         return dataset
