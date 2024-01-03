@@ -16,13 +16,14 @@ class Llama2():
         quant_config = BitsAndBytesConfig(
                             load_in_4bit=True,
                             bnb_4bit_quant_type='nf4',
-                            bnb_4bit_compute_dtype='float16',
+                            bnb_4bit_compute_dtype='bfloat16',
                             bnb_4bit_use_dobule_quant=True
                         )
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         #self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config, use_flash_attention_2=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map='auto', quantization_config=quant_config)
+        self.model = self.model.bfloat16()
         self.model.eval()
         self.model.config.pretraining_tp = 1
         self.max_new_tokens = max_new_tokens

@@ -52,18 +52,18 @@ def normalize(s: str) -> str:
 
 
 
-def f1(prediction, ground_truth):
+def f1_single(prediction, ground_truth):
     prediction_tokens = prediction.split()
     ground_truth_tokens = ground_truth.split()
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
 
     if num_same == 0:
-        return 0
+        return 0, 0, 0
     precision = 1.0 * num_same / len(prediction_tokens)
     recall = 1.0 * num_same / len(ground_truth_tokens)
     f1 = (2 * precision * recall) / (precision + recall)
-    return f1
+    return f1, precision, recall
 
 def rouge_wrapper(prediction, ground_truth):
     try:
@@ -95,30 +95,41 @@ def rouge_score(predictions, references):
 
 
 def f1_score(predictions, references):
-    return np.mean([max([f1(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
+    f1, precision, recall = list(), list(), list()
+    for ground_truths, prediction in zip(references, predictions):
+        print(ground_truths, prediction)
+        f1_, precision_, recall_ = [max(values) for values in zip(*[f1_single(prediction, gt) for gt in ground_truths])]
+        print(f1_, precision_, recall_)
+        f1.append(f1_)
+        precision.append(precision_)
+        recall.append(recall_)
+    return np.mean(f1), np.mean(precision), np.mean(recall)
 
-def em(prediction, ground_truth):
+def em_single(prediction, ground_truth):
     return float(normalize(prediction) == normalize(ground_truth))
 
 
 def exact_match_score(predictions, references):
-    return np.mean([max([em(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
+    return np.mean([max([em_single(prediction, gt) for gt in ground_truths]) for ground_truths, prediction in zip(references, predictions)])
 
 
 class Metrics:
     def __init__(self, dataset_name, bem=True):
         self.dataset_name = dataset_name
-        #if bem:
+        # if bem:
         #    from evaluation.bem import BEM
         #    self.bem = BEM()
 
     def compute(self, predictions, references, questions=None):
-        if self.dataset_name == "nq_open":
+        if "nq_open" in self.dataset_name:
             rouge1, rouge2, rougel = rouge_score(predictions, references)
+            f1, precision, recall = f1_score(predictions, references)
             return {
                         "EM": exact_match_score(predictions, references),
                         #"BEM": self.bem(references, predictions, questions),
-                        "f1": f1_score(predictions, references),
+                        "F1": f1,
+                        "Precision": precision, 
+                        "Recall": recall,
                         "Rouge-1": rouge1,
                         "Rouge-2": rouge2,
                         "Rouge-L": rougel,

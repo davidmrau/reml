@@ -17,8 +17,11 @@ def get_by_ids(dataset, ids):
 def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
 
     if q_ids == d_ids == None:
-        dataset_dict = {'query': dataset['content'], 'q_id': dataset['id']}
-        
+        dataset_dict = {
+            'query': dataset['query']['content'], 
+            'q_id': dataset['query']['id'],
+            'label': dataset['query']['label'],
+            }
     else:
         dataset_dict = {'query': [], 'doc': [], 'q_id': []}
         labels = dataset['query']['label'] if 'label' in dataset['query'].features else None
@@ -52,15 +55,16 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
                             dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(responses, query_ids, labels, n=3):
+def print_generate_out(queries, instructions, responses, query_ids, labels, n=3):
     rand = random.sample(range(len(query_ids)), n)
     for i in rand:
         print('_'*50)
         print('Query ID:', query_ids[i])
+        print('Query:', queries[i])
         print('_'*50)
-        #print('Instruction to Generator:')
-        #print(instructions[i])
-        #print()
+        print('Instruction to Generator:')
+        print(instructions[i])
+        print()
         print('Generated Response:')
         print(responses[i])
         print('Label:')

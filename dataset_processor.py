@@ -101,16 +101,18 @@ class Processor(object):
     
     def get_dataset(self, dataset_name, split, debug=False):
         print(f'Processing dataset: {dataset_name}')
-        out_folder = f'{self.out_folder}/{dataset_name}_{split}'
+        debug_str = '_debug' if debug else ''
+        out_folder = f'{self.out_folder}/{dataset_name}_{split}{debug_str}'
+        dataset_name += debug_str
         if os.path.exists(out_folder) and not self.overwrite:
             dataset = datasets.load_from_disk(out_folder)
-            if debug:
-                dataset = dataset.select(range(3))
             #id2index = self.tsv_to_dict(f'{out_folder}/id2index.csv')
             id2index = pickle.load(open(f'{out_folder}/id2index.p', 'rb'))
             dataset.id2index = id2index
         else:
             dataset = self.processors[dataset_name].process(split, num_proc=self.num_proc)
+            if debug:
+                dataset = dataset.select(range(15))
             dataset.save_to_disk(out_folder)
             id2index = self.get_index_to_id(dataset) 
             dataset.id2index = id2index

@@ -32,22 +32,22 @@ class RAG:
         self.processing_num_proc = processing_num_proc
         self.index_folder = index_folder
         self.dataset_config = dataset_config
+
+        # process datasets, downloading, loading, covert to format
+        self.datasets = ProcessDatasets.process(
+            dataset_config, 
+            out_folder=self.dataset_folder, 
+            num_proc=processing_num_proc,
+            overwrite=overwrite_datasets,
+            debug=debug,
+            )
         self.metrics = {
             "train": None,
             # lookup metric with dataset name (tuple: dataset_name, split) 
-            "test": Metrics(dataset_config['test']['query'][0]), 
+            "test": Metrics(self.datasets['test']['query'].name), 
             "dev": None
         }
 
-        with torch.no_grad(): 
-            # process datasets, downloading, loading, covert to format
-            self.datasets = ProcessDatasets.process(
-                dataset_config, 
-                out_folder=self.dataset_folder, 
-                num_proc=processing_num_proc,
-                overwrite=overwrite_datasets,
-                debug=debug,
-                )
 
         print_rag_model(self, retriever_config,reranker_config, generator_config)
         # init modules
@@ -70,7 +70,7 @@ class RAG:
 
     def default(self, split):
         fetch_pyserini_docs=False
-        dataset_name = self.dataset_config[split]["query"][0]
+        dataset_name = self.datasets[split]["query"].name
         if self.retriever !=  None:
             ranking_file = f'{self.run_folder}/run.retrieve.top_{self.retriever.top_k_documents}.{dataset_name}.{split}.{self.retriever.get_model_name()}.trec'
             if not os.path.exists(ranking_file):
@@ -107,7 +107,6 @@ class RAG:
                 write_trec(reranking_file, query_ids, doc_ids, scores)
             else:
                 query_ids, doc_ids, scores = load_trec(reranking_file)
-
         if self.generator != None: 
             gen_dataset = make_hf_dataset(
                 self.datasets[split], 
@@ -124,6 +123,7 @@ class RAG:
                 references=labels, 
                 questions=queries
                 )
+            print(metrics_out)
             out_folder = f'{self.experiment_folder}/{self.run_name}/'
             write_generated(
                 out_folder,
@@ -136,6 +136,8 @@ class RAG:
                 )
 
             print_generate_out(
+                queries,
+                instructions,
                 responses,
                 query_ids, 
                 labels)
