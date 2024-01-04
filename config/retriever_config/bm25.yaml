@@ -1,5 +1,3 @@
 model_name: "bm25"
 batch_size: 1024
 batch_size_sim: 256
-top_k_documents: 5
-pyserini_num_threads: 4

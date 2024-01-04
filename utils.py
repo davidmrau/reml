@@ -2,8 +2,7 @@ import datasets
 import random 
 import json
 from collections import defaultdict
-import torch
-
+import shutil
 
 def get_by_ids(dataset, ids, field):
     # if single id is passed cast it to list
@@ -57,9 +56,8 @@ def make_hf_dataset(dataset, q_ids, d_ids, multi_doc=False, pyserini_docs=None):
                             dataset_dict['label'].append(labels[i])
     return datasets.Dataset.from_dict(dataset_dict)
 
-def print_generate_out(queries, instructions, responses, query_ids, labels, n=10):
-    #rand = random.sample(range(len(query_ids)), n)
-    rand = range(10)
+def print_generate_out(queries, instructions, responses, query_ids, labels, n=5):
+    rand = random.sample(range(len(query_ids)), n)
     for i in rand:
         print('_'*50)
         print('Query ID:', query_ids[i])
@@ -96,22 +94,20 @@ def write_trec(fname, q_ids, d_ids, scores):
             for rank, (d_id, score) in enumerate(zip(d_ids[i], scores[i])):
                 fout.write(f'{q_id}\tq0\t{d_id}\t{rank+1}\t{score}\trun\n')
 
-def write_generated(out_folder, query_ids, instructions, responses, labels, metrics_out, generation_time_seconds):
-    json_dict = {}
-    json_dict['gen_time_hours'] = generation_time_seconds/3600
-    json_dict['metrics'] = metrics_out
-    json_dict['generated'] = list()
-    
+def write_generated(out_folder, out_filename, query_ids, instructions, responses, labels):
+    jsonl_list = list()
     for i, (q_id, response, instruction, label) in enumerate(zip(query_ids, responses, instructions, labels)):
         jsonl = {}
         jsonl['q_id'] = q_id
         jsonl['response'] = response
         jsonl['instruction'] = instruction
         jsonl['label'] = label
-        json_dict['generated'].append(jsonl)
+        jsonl_list.append(jsonl)
+    write_dict(out_folder, out_filename, jsonl_list)
 
-    with open(f'{out_folder}/generated_out.json', 'w') as fp:
-        json.dump(json_dict, fp)
+def write_dict(out_folder, out_filename, dict_to_write):
+    with open(f'{out_folder}/{out_filename}', 'w') as fp:
+        json.dump(dict_to_write, fp)
 
 def load_trec(fname):
     # read file
@@ -129,3 +125,10 @@ def load_trec(fname):
         d_ids.append(d_ids_q)
         scores.append(scores_q)
     return q_ids, d_ids, scores
+
+
+def get_finished_experiment_name(experiment_folder):
+    return experiment_folder.replace('tmp_', '')
+
+def move_finished_experiment(experiment_folder):
+    shutil.move(experiment_folder, get_finished_experiment_name(experiment_folder))

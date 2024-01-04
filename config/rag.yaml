@@ -2,16 +2,19 @@
 
 defaults:
     - _self_
-    - retriever_config: retromae
+    - retriever_config: splade
     - reranker_config: null
     - generator_config: llama-2-7b-chat
     - dataset_config: nq_open
 
-run_name: ???
+retrieve_top_k: 5
+rerank_top_k: 5
+pyserini_num_threads: 6
+run_name: null
 dataset_folder: 'datasets/'
 index_folder: 'indexes/'
-run_folder: 'runs/'
-experiment_folder: 'experiments/'
+runs_folder: 'runs/'
+experiments_folder: 'experiments/'
 processing_num_proc: 40
 overwrite_datasets: false
 debug: false

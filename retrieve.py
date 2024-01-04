@@ -90,9 +90,9 @@ class Retrieve:
             
             return bm25_out
         else:
-            doc_embs = self.load_index(index_path)
             q_embs = self.encode(dataset['query'], query_or_doc='query')
-            scores_sorted_topk, indices_sorted_topk = self.similarity_dot(q_embs, doc_embs)
+            #doc_embs = self.load_index(index_path)
+            scores_sorted_topk, indices_sorted_topk = self.load_collection_and_retrieve(q_embs, index_path)
             if return_embeddings:
                 # use sorted top-k indices indices to retrieve corresponding document embeddings
                 doc_embs = doc_embs[indices_sorted_topk]
@@ -108,18 +108,18 @@ class Retrieve:
                 }
 
     def load_index(self, index_path):
-        num_emb_files = len(glob.glob(f'{index_path}/*.pt'))
+        emb_files = glob.glob(f'{index_path}/*.pt')
+        sorted_emb_files = sorted(emb_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
         embs = list()
-        for i in tqdm(range(num_emb_files), total=num_emb_files, desc=f'Loading saved index {index_path}'):
-            chunk_path = self.get_chunk_path(index_path, i)
-            emb = torch.load(chunk_path)
+        for emb_file in tqdm(sorted_emb_files, total=len(sorted_emb_files), desc=f'Loading saved index {index_path}'):
+            emb = torch.load(emb_file)
             embs.append(emb)
         embs = torch.cat(embs)
         return embs.to(self.model.device)
 
     @torch.no_grad() 
-    def encode(self, dataset, query_or_doc=None, detach=False, index_path=None, chunk_size=5000):
-        continue_example = 0
+    def encode(self, dataset, query_or_doc=None, detach=False, index_path=None, chunk_size=1000):
+        #continue_example = 135000
         if index_path != None:
             os.makedirs(index_path, exist_ok=True)
         dataloader = DataLoader(
@@ -132,7 +132,7 @@ class Retrieve:
         
         embs_list = list()
         for i, batch in tqdm(enumerate(dataloader), total=len(dataset)//self.batch_size, desc=f'Encoding: {self.model_name}', file=sys.stdout):
-            #if i <= continue_example:
+            # if i <= continue_example:
             #    continue
             outputs = self.model(batch)
             emb = outputs['embedding']
@@ -172,6 +172,24 @@ class Retrieve:
         sorted_scores = torch.cat(scores_sorted, dim=0)
         indices_sorted = torch.cat(indices_sorted, dim=0)
         return sorted_scores, indices_sorted
+
+    @torch.no_grad() 
+    def load_collection_and_retrieve(self, emb_q, index_path):
+        emb_files = glob.glob(f'{index_path}/*.pt')
+        sorted_emb_files = sorted(emb_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
+        scores_sorted, indices_sorted = list(), list()
+        for emb_file in tqdm(sorted_emb_files, total=len(sorted_emb_files), desc=f'Load and retrieve...'):
+            emb_chunk = torch.load(emb_file)
+            emb_chunk = emb_chunk.to(self.model.device)
+            scores_q = torch.sparse.mm(emb_q, emb_chunk.t())
+            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=1)
+            scores_sorted_q = scores_sorted_q.detach().cpu()
+            scores_sorted.append(scores_sorted_q)
+            indices_sorted.append(indices_sorted_q)
+        sorted_scores = torch.cat(scores_sorted, dim=0)
+        indices_sorted = torch.cat(indices_sorted, dim=0)
+        return sorted_scores, indices_sorted
+
 
     def tokenize(self, example):
        return self.model.tokenize(example)
