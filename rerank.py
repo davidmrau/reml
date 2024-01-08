@@ -52,7 +52,7 @@ class Rerank():
             ranking[q_id].append((scores[i], d_id))
         for q_id in ranking:
             # sort (score, doc_id) by score
-            sorted_list = sorted(ranking[q_id], key=lambda x: x[0])
+            sorted_list = sorted(ranking[q_id], key=lambda x: x[0], reverse=True)
             score_sorted, d_id_sorted = zip(*sorted_list)
             scores_sorted.append(torch.stack(score_sorted))
             doc_ids_sorted.append(list(d_id_sorted))

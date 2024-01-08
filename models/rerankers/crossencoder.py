@@ -1,8 +1,6 @@
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from torch.utils.data import DataLoader
 import torch
 
-from transformers import DefaultDataCollator, AutoModel, AutoTokenizer
 class CrossEncoder:
     def __init__(self, model_name=None):
 
@@ -17,7 +15,6 @@ class CrossEncoder:
         return {
                 "score": score
             }
-
     def collate_fn(self, examples):
         question = [e['query'] for e in examples]
         doc = [e['doc'] for e in examples]

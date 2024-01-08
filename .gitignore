@@ -1,6 +1,6 @@
 *._*
 slurm/slurm-*
-experiments/
+experiments*
 *__pycache__*
 datasets/
 indexes/

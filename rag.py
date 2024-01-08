@@ -32,9 +32,6 @@ class RAG:
                 debug=False,
 
                 ):
-        
-        
-        
         self.dataset_folder = dataset_folder
         self.experiments_folder = experiments_folder
         self.runs_folder = runs_folder
@@ -73,27 +70,29 @@ class RAG:
                     top_k_documents=self.retrieve_top_k,
                     pyserini_num_threads=self.pyserini_num_threads,
                     ) if retriever_config != None else None
+
         self.reranker = Rerank(
             **reranker_config,
             top_k_documents=self.rerank_top_k,
             ) if reranker_config != None else None
+            
         self.generator = Generate(**generator_config) if generator_config != None else None   
 
     def default(self, split):
-        fetch_pyserini_docs=False
         # retrieve
-        query_ids, doc_ids, docs, scores = self.retrieve(split)
+        query_ids, doc_ids, scores, _  = self.retrieve(split)
+        # raise NotImplementedError("somehow q_ids and doc_ids are not same length after retreival with retromae")
         # rerank
-        query_ids, doc_ids, docs, scores = self.rerank(split)
+        query_ids, doc_ids, scores = self.rerank(split, query_ids, doc_ids)
         # generate
-        questions, instructions, predictions, references = self.generate(split, query_ids, doc_ids, docs, scores)
+        questions, instructions, predictions, references = self.generate(split, query_ids, doc_ids)
         # eval metrics
         self.eval_metrics(split, questions, predictions, references)
 
         move_finished_experiment(self.experiment_folder)
 
 
-    def retrieve(self, split):
+    def retrieve(self, split, fetch_pyserini_docs=False):
         
         if self.retriever ==  None:
             return None, None, None, None
@@ -118,15 +117,15 @@ class RAG:
             query_ids, doc_ids, scores = load_trec(ranking_file)
             docs = None
 
-        return query_ids, doc_ids, docs, scores
+        return query_ids, doc_ids, scores, docs
 
-    def rerank(self, split):
+    def rerank(self, split, query_ids, doc_ids, docs=None):
         
         if self.reranker ==  None:
-            return None, None, None, None
+            return None, None, None
 
         dataset_name = self.datasets[split]["query"].name
-        reranking_file = f'{self.runs_folder}/run.rerank.top_{self.reranker.top_k_documents}.{dataset_name}.{split}.{self.retriever.get_model_name()}.trec'
+        reranking_file = f'{self.runs_folder}/run.rerank.retreiver.top_{self.retriever.top_k_documents}.{self.retriever.get_model_name()}.rerank.top_{self.reranker.top_k_documents}.{dataset_name}.{split}.{self.retriever.get_model_name()}.trec'
         if not os.path.exists(reranking_file):
             rerank_dataset = make_hf_dataset(
                     self.datasets[split], 
@@ -136,7 +135,7 @@ class RAG:
                     pyserini_docs=docs
                 )
             out_ranking = self.reranker.eval(rerank_dataset)
-            query_ids, doc_ids, docs, scores = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['doc'], out_ranking['score']
+            query_ids, doc_ids, scores = out_ranking['q_id'], out_ranking['doc_id'], out_ranking['score']
             write_trec(reranking_file, query_ids, doc_ids, scores)
         else:
             # copy reranking file to experiment folder 
@@ -144,10 +143,10 @@ class RAG:
             query_ids, doc_ids, scores = load_trec(reranking_file)
             docs = None
         
-        return query_ids, doc_ids, docs, scores
+        return query_ids, doc_ids, scores
 
 
-    def generate(self, split, query_ids, doc_ids, docs, scores):
+    def generate(self, split, query_ids, doc_ids, docs=None):
         if self.generator == None: 
             return None, None, None, None, None
 
@@ -201,7 +200,6 @@ class RAG:
         experiment_folder = f"{experiments_folder}/{run_name}"
         # get name of finished experiment
         finished_exp_name = get_finished_experiment_name(experiment_folder)
-        print(finished_exp_name)
         # if experiment already exists finished quit
         if os.path.exists(finished_exp_name):
             raise OSError(f"Experiment {finished_exp_name} already exists!")
