@@ -3,7 +3,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch
 from collections import defaultdict
-
+from models.rerankers.crossencoder import CrossEncoder
 # reranking
 class Rerank():
     def __init__(self, model_name=None, batch_size=1, top_k_documents=1):
@@ -11,14 +11,11 @@ class Rerank():
         self.model_name = model_name
         self.batch_size = batch_size
         self.top_k_documents = top_k_documents
-
-        # init model
-        from models.rerankers.crossencoder import CrossEncoder
-        # instaniate model
-        self.model = CrossEncoder(model_name=self.model_name)
-
+        
+    @torch.no_grad()
     def eval(self, dataset, return_embeddings=False):
         # get dataloader
+        self.model = CrossEncoder(model_name=self.model_name)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=self.model.collate_fn)
         q_ids, d_ids, scores, embs_list = list(), list(), list(), list()
         # run inference on the dataset
@@ -36,7 +33,8 @@ class Rerank():
         scores = torch.cat(scores).ravel()
         # sort by scores 
         q_ids_sorted, d_ids_sorted, scores_sorted = self.sort_by_score_indexes(scores, q_ids, d_ids)
-
+        del self.model
+        torch.cuda.empty_cache()
         return {
             "emb": embs_list if return_embeddings else None,
             "score": scores_sorted,

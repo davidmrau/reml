@@ -76,6 +76,7 @@ class BEM:
         # They can be transformed into a classification 'probability' like so:
         del self.model
         scores = torch.cat(scores)
+        torch.cuda.empty_cache()
         return F.softmax(scores, dim=1)[:, 1].mean().item()
 
 

@@ -92,13 +92,13 @@ class Retrieve:
         else:
             q_embs = self.encode(dataset['query'], query_or_doc='query')
             #doc_embs = self.load_index(index_path)
+            #scores_sorted_topk, indices_sorted_topk = self.similarity_dot(q_embs, doc_embs)
             scores_sorted_topk, indices_sorted_topk = self.load_collection_and_retrieve(q_embs, index_path)
             if return_embeddings:
                 # use sorted top-k indices indices to retrieve corresponding document embeddings
                 doc_embs = doc_embs[indices_sorted_topk]
             # Use sorted top-k indices indices to retrieve corresponding document IDs
             doc_ids = [[doc_ids[i] for i in q_idxs] for q_idxs in indices_sorted_topk]
-
             return {
                 "doc_emb": doc_embs if return_embeddings else None,
                 "q_emb": q_embs if return_embeddings else None,
@@ -106,16 +106,6 @@ class Retrieve:
                 "q_id": q_ids,
                 "doc_id": doc_ids
                 }
-
-    def load_index(self, index_path):
-        emb_files = glob.glob(f'{index_path}/*.pt')
-        sorted_emb_files = sorted(emb_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
-        embs = list()
-        for emb_file in tqdm(sorted_emb_files, total=len(sorted_emb_files), desc=f'Loading saved index {index_path}'):
-            emb = torch.load(emb_file)
-            embs.append(emb)
-        embs = torch.cat(embs)
-        return embs.to(self.model.device)
 
     @torch.no_grad() 
     def encode(self, dataset, query_or_doc=None, detach=False, index_path=None, chunk_size=1000):
@@ -157,39 +147,30 @@ class Retrieve:
             return None
         else:
             return torch.cat(embs_list)
-    
-    def similarity_dot(self, emb_q, emb_doc, batch_size=250):
-        scores_sorted, indices_sorted = list(), list()
-        emb_q = emb_q.half()
-        # !! perhaps OOM for very large corpora, might need to be batched for documents as well
-        for i in tqdm(range(0, emb_q.shape[0], self.batch_size_sim), desc=f'Retrieving docs...', total=emb_q.shape[0]//batch_size):
-            emb_q_batch= emb_q[i:i+self.batch_size_sim]
-            scores_q = torch.matmul(emb_q_batch, emb_doc.t())
-            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=1)
-            scores_sorted_q = scores_sorted_q.detach().cpu()
-            scores_sorted.append(scores_sorted_q)
-            indices_sorted.append(indices_sorted_q)
-        sorted_scores = torch.cat(scores_sorted, dim=0)
-        indices_sorted = torch.cat(indices_sorted, dim=0)
-        return sorted_scores, indices_sorted
 
-    @torch.no_grad() 
+    @torch.no_grad()
     def load_collection_and_retrieve(self, emb_q, index_path):
         emb_files = glob.glob(f'{index_path}/*.pt')
         sorted_emb_files = sorted(emb_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
-        scores_sorted, indices_sorted = list(), list()
+
+        top_k_scores_list, top_k_indices_list = [], []
+        num_emb = 0
         for emb_file in tqdm(sorted_emb_files, total=len(sorted_emb_files), desc=f'Load and retrieve...'):
             emb_chunk = torch.load(emb_file)
             emb_chunk = emb_chunk.to(self.model.device)
-            scores_q = torch.sparse.mm(emb_q, emb_chunk.t())
+            scores_q = torch.sparse.mm(emb_q, emb_chunk.t())  
             scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=1)
-            scores_sorted_q = scores_sorted_q.detach().cpu()
-            scores_sorted.append(scores_sorted_q)
-            indices_sorted.append(indices_sorted_q)
-        sorted_scores = torch.cat(scores_sorted, dim=0)
-        indices_sorted = torch.cat(indices_sorted, dim=0)
-        return sorted_scores, indices_sorted
-
+            top_k_scores_list.append(scores_sorted_q)
+            top_k_indices_list.append(indices_sorted_q+num_emb)
+            num_emb += emb_chunk.shape[0]
+        # Concatenate top-k scores and indices from each chunk
+        all_top_k_scores = torch.cat(top_k_scores_list, dim=1)
+        all_top_k_indices = torch.cat(top_k_indices_list, dim=1)
+        # Get final top-k scores and indices across all chunks
+        final_top_k_scores, top_k_indices = torch.topk(all_top_k_scores, self.top_k_documents, dim=1)
+        # Extract corresponding indices for final top-k scores
+        final_top_k_indices = torch.gather(all_top_k_indices, 1, top_k_indices)
+        return final_top_k_scores, final_top_k_indices
 
     def tokenize(self, example):
        return self.model.tokenize(example)
@@ -206,3 +187,33 @@ class Retrieve:
     def get_chunk_path(self, index_path, chunk):
         return f'{index_path}/embedding_chunk_{chunk+1}.pt'
 
+
+
+
+    @torch.no_grad() 
+    def similarity_dot(self, emb_q, emb_doc, batch_size=250):
+        scores_sorted, indices_sorted = list(), list()
+        emb_q = emb_q.half()
+        # !! perhaps OOM for very large corpora, might need to be batched for documents as well
+        for i in tqdm(range(0, emb_q.shape[0], self.batch_size_sim), desc=f'Retrieving docs...', total=emb_q.shape[0]//batch_size):
+            emb_q_batch= emb_q[i:i+self.batch_size_sim]
+            scores_q = torch.matmul(emb_q_batch, emb_doc.t())
+            scores_sorted_q, indices_sorted_q = torch.topk(scores_q, self.top_k_documents, dim=1)
+            scores_sorted_q = scores_sorted_q.detach().cpu()
+            scores_sorted.append(scores_sorted_q)
+            indices_sorted.append(indices_sorted_q)
+        sorted_scores = torch.cat(scores_sorted, dim=0)
+        indices_sorted = torch.cat(indices_sorted, dim=0)
+        return sorted_scores, indices_sorted
+
+    def load_index(self, index_path):
+        emb_files = glob.glob(f'{index_path}/*.pt')
+        sorted_emb_files = sorted(emb_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
+        embs = list()
+        for emb_file in tqdm(sorted_emb_files, total=len(sorted_emb_files), desc=f'Loading saved index {index_path}'):
+            emb = torch.load(emb_file)
+            embs.append(emb)
+        embs = torch.cat(embs)
+        return embs.to(self.model.device)
+
+        

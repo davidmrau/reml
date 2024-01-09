@@ -83,6 +83,7 @@ class RAG:
         query_ids, doc_ids, scores, _  = self.retrieve(split)
         # raise NotImplementedError("somehow q_ids and doc_ids are not same length after retreival with retromae")
         # rerank
+        print(len(query_ids), len(doc_ids))
         query_ids, doc_ids, scores = self.rerank(split, query_ids, doc_ids)
         # generate
         questions, instructions, predictions, references = self.generate(split, query_ids, doc_ids)
